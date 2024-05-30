@@ -86,9 +86,11 @@ def inference(model, image_path, output_dir):
 
     # im_vis = np.concatenate([heat_map, show_boundary], axis=1)
     im_vis = np.concatenate([show_boundary], axis=1)
-    
+
+    _, im_buf_arr = cv2.imencode('.jpg', im_vis)    # 한글경로 인식 문제 해결
     path = os.path.join(output_dir, os.path.basename(image_path).split(".")[0] + '_infered.jpg')
-    cv2.imwrite(path, im_vis)
+    with open(path, 'wb') as f:
+        f.write(im_buf_arr)
 
     contours = output_dict["py_preds"][-1].int().cpu().numpy()
     img_show, contours = rescale_result(img_show, contours, H, W)
@@ -98,6 +100,7 @@ def inference(model, image_path, output_dir):
         tmp = np.expand_dims(tmp, axis=2)
     
     fname = path.replace('jpg', 'txt')
+
     write_to_file(contours, fname)
     
 
@@ -117,7 +120,7 @@ def main(image_path):
         output_dir = os.path.dirname(image_path) 
         inference(model, image_path, output_dir)
 
-    print("infer result saved: {}".format(output_dir))
+    
 
 
 if __name__ == "__main__":
@@ -125,5 +128,5 @@ if __name__ == "__main__":
     args = option.initialize()
 
     update_config(cfg, args)
-    image_path = '/mnt/hdd/sgh_server/mixNet/infer_set/150.jpg'
+    image_path = 'C:/Users/ys/Desktop/sgh/MixNet/(주)나일소프트_통장사본(신한).jpg'
     main(image_path)
