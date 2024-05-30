@@ -104,7 +104,26 @@ def inference(model, image_path, output_dir):
     write_to_file(contours, fname)
     
 
+def inference_folder(model, folder_path, output_dir):
+    for filename in os.listdir(folder_path):
+        if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.PNG', '.JPG', '.JPEG')):
+            image_path = os.path.join(folder_path, filename)
+            inference(model, image_path, output_dir)
 
+
+
+# def main(image_path):
+#     cudnn.benchmark = False
+#     model = TextNet(is_training=False, backbone=cfg.net)
+#     model_path = os.path.join(cfg.save_dir, cfg.exp_name,
+#                               'MixNet_{}_{}.pth'.format(model.backbone_name, cfg.checkepoch))
+#     model.load_model(model_path)
+#     model.to(torch.device("cuda"))
+#     model.eval()
+#     with torch.no_grad():
+#         print('Start infer MixNet.')
+#         output_dir = os.path.dirname(image_path) 
+#         inference(model, image_path, output_dir)
 
 
 def main(image_path):
@@ -117,10 +136,12 @@ def main(image_path):
     model.eval()
     with torch.no_grad():
         print('Start infer MixNet.')
-        output_dir = os.path.dirname(image_path) 
-        inference(model, image_path, output_dir)
-
-    
+        if os.path.isdir(image_path):
+            output_dir = image_path
+            inference_folder(model, image_path, output_dir)
+        else:
+            output_dir = os.path.dirname(image_path)
+            inference(model, image_path, output_dir)    
 
 
 if __name__ == "__main__":
@@ -128,5 +149,5 @@ if __name__ == "__main__":
     args = option.initialize()
 
     update_config(cfg, args)
-    image_path = 'C:/Users/ys/Desktop/sgh/MixNet/(주)나일소프트_통장사본(신한).jpg'
+    image_path = 'C:/Users/ys/Desktop/sgh/MixNet/infer_test_datas/images'
     main(image_path)

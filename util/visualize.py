@@ -146,6 +146,7 @@ def visualize_detection(image, output_dict, meta=None):
                         meta['image_id'][0].split(".")[0] + "_init.png")
 
     im_show0 = image_show.copy()
+    ## 추후 아랫 init_py 부분은 inference 시에는 삭제하도록 변경
     for i, bpts in enumerate(init_py.astype(np.int32)):
         cv2.drawContours(im_show0, [bpts.astype(np.int32)], -1, (255, 0, 255), 2)
         for j, pp in enumerate(bpts):
