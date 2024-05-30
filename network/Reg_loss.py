@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-# @Time    : 10/1/21
-# @Author  : GXYM
 import torch
 from torch import nn
 import numpy as np
@@ -26,7 +23,6 @@ class PolyMatchingLoss(nn.Module):
 
         pidxall = torch.from_numpy(np.reshape(pidxall, newshape=(batch_size, -1))).to(device)
         self.feature_id = pidxall.unsqueeze_(2).long().expand(pidxall.size(0), pidxall.size(1), 2).detach()
-        # print(self.feature_id.shape)
 
     def match_loss(self, pred, gt):
         batch_size = pred.shape[0]
@@ -53,18 +49,6 @@ class PolyMatchingLoss(nn.Module):
 
         return loss / torch.tensor(len(pred_list))
 
-        # los = []
-        # for pred in pred_list:
-        #     los.append(self.match_loss(pred, gt))
-        #
-        # los_b = torch.tensor(0.)
-        # loss_c = torch.tensor(0.)
-        # for i, _ in enumerate(los):
-        #     los_b += torch.mean(los[i])
-        #     loss_c += (torch.mean(torch.clamp(los[i] - los[i - 1], min=0.0)) if i > 0 else torch.tensor(0.))
-        # loss = los_b / torch.tensor(len(los)) + 0.5*loss_c / torch.tensor(len(los)-1)
-        #
-        # return loss
 
 
 class AttentionLoss(nn.Module):
@@ -108,13 +92,6 @@ class AELoss(nn.Module):
         super(AELoss, self).__init__()
 
     def forward(self, ae, ind, ind_mask):
-        """
-        ae: [b, 1, h, w]
-        ind: [b, max_objs, max_parts]
-        ind_mask: [b, max_objs, max_parts]
-        obj_mask: [b, max_objs]
-        """
-        # first index
         b, _, h, w = ae.shape
         b, max_objs, max_parts = ind.shape
         obj_mask = torch.sum(ind_mask, dim=2) != 0
@@ -123,17 +100,15 @@ class AELoss(nn.Module):
         seed_ind = ind.view(b, max_objs * max_parts, 1)
         tag = ae.gather(1, seed_ind).view(b, max_objs, max_parts)
 
-        # compute the mean
         tag_mean = tag * ind_mask
         tag_mean = tag_mean.sum(2) / (ind_mask.sum(2) + 1e-4)
 
-        # pull ae of the same object to their mean
         pull_dist = (tag - tag_mean.unsqueeze(2)).pow(2) * ind_mask
         obj_num = obj_mask.sum(dim=1).float()
         pull = (pull_dist.sum(dim=(1, 2)) / (obj_num + 1e-4)).sum()
         pull /= b
 
-        # push away the mean of different objects
+
         push_dist = torch.abs(tag_mean.unsqueeze(1) - tag_mean.unsqueeze(2))
         push_dist = 1 - push_dist
         push_dist = nn.functional.relu(push_dist, inplace=True)
