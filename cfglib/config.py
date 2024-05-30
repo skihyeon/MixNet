@@ -69,8 +69,6 @@ config.know = False
 # config.know_resume = "./model/Totaltext_mid/TextBPN_mixTriHRnet_cbam_622.pth"
 
 
-config.viz = True
-
 def update_config(config, extra_config):
     for k, v in vars(extra_config).items():
         config[k] = v

@@ -74,17 +74,7 @@ def inference(model, test_loader, output_dir):
             gt_vis = visualize_gt(img_show, gt_contour, label_tag)
             show_boundary, heat_map = visualize_detection(img_show, output_dict, meta=meta)
 
-            # show_map = np.concatenate([heat_map, gt_vis], axis=1)
-            # show_map = cv2.resize(show_map, (320 , 320))
-            # im_vis = np.concatenate([show_map, show_boundary], axis=1)
             im_vis = np.concatenate([heat_map, gt_vis, show_boundary], axis=1)
-
-            # if show_map.shape[1] != show_boundary.shape[1]:
-            #     target_width = max(show_map.shape[1], show_boundary.shape[1])
-            #     show_map = cv2.resize(show_map, (target_width, show_map.shape[0]))
-            #     show_boundary = cv2.resize(show_boundary, (target_width, show_boundary.shape[0]))
-
-            # im_vis = np.concatenate([show_map, show_boundary], axis=0)
 
             path = os.path.join(cfg.vis_dir, '{}_test'.format(cfg.exp_name), meta['image_id'][idx].split(".")[0]+".jpg")
             cv2.imwrite(path, im_vis)
