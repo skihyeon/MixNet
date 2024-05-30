@@ -6,7 +6,7 @@ import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
 import torch.utils.data as data
-
+from sklearn.metrics import f1_score, accuracy_score
 from dataset import TotalText, myDataset
 from network.textnet import TextNet
 from cfglib.config import config as cfg, update_config
@@ -73,7 +73,9 @@ def inference(model, test_loader, output_dir):
 
             gt_vis = visualize_gt(img_show, gt_contour, label_tag)
             show_boundary, heat_map = visualize_detection(img_show, output_dict, meta=meta)
-
+            heat_map = cv2.resize(heat_map, (W, H))
+            gt_vis = cv2.resize(gt_vis, (W, H))
+            show_boundary = cv2.resize(show_boundary, (W, H))
             im_vis = np.concatenate([heat_map, gt_vis, show_boundary], axis=1)
 
             path = os.path.join(cfg.vis_dir, '{}_test'.format(cfg.exp_name), meta['image_id'][idx].split(".")[0]+".jpg")
@@ -88,7 +90,7 @@ def inference(model, test_loader, output_dir):
         if tmp.ndim == 2:
             tmp = np.expand_dims(tmp, axis=2)
 
-        fname = meta['image_id'][idx].replace('jpg', 'txt').replace('JPG', 'txt').replace('PNG', 'txt')
+        fname = meta['image_id'][idx].replace('jpg', 'txt').replace('JPG', 'txt').replace('PNG', 'txt').replace('png', 'txt')
         write_to_file(contours, os.path.join(output_dir, fname))
 
 
@@ -102,7 +104,7 @@ def main(vis_dir_path):
     #     transform=BaseTransform(size=cfg.test_size, mean=cfg.means, std=cfg.stds)
     # )
     testset = myDataset(
-        data_root = 'data/inferset',
+        data_root = 'data/hipass',
         is_training=False,
         load_memory=cfg.load_memory,
         transform=BaseTransform(size=cfg.test_size, mean=cfg.means, std=cfg.stds)

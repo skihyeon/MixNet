@@ -39,7 +39,7 @@ class BaseOptions(object):
         # self.parser.add_argument('--input_channel', default=1, type=int, help='number of input channels' )
         self.parser.add_argument('--pretrain', default=False, type=str2bool, help='Pretrained AutoEncoder model')
         self.parser.add_argument('--verbose', '-v', default=True, type=str2bool, help='Whether to output debug info')
-        self.parser.add_argument('--viz', action='store_true', help='Whether to output debug info')
+        self.parser.add_argument('--viz', default=True, help='Whether to output debug info')
         # self.parser.add_argument('--viz', default=True, type=str2bool, help='Whether to output debug info')
 
         # train opts

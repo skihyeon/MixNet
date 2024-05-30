@@ -123,8 +123,8 @@ def visualize_gt(image, contours, label_tag):
     image_show = cv2.polylines(image_show,
                                [contours[i] for i, tag in enumerate(label_tag) if tag <0], True, (0, 255, 0), 3)
 
-    show_gt = cv2.resize(image_show, (320, 320))
-
+    # show_gt = cv2.resize(image_show, (320, 320))
+    show_gt = image_show
     return show_gt
 
 def visualize_detection(image, output_dict, meta=None):
@@ -188,6 +188,6 @@ def visualize_detection(image, output_dict, meta=None):
     dis_pred = cav.heatmap(np.array(cls_preds[1] * 255, dtype=np.uint8))
 
     heat_map = np.concatenate([cls_pred*255, dis_pred*255], axis=1)
-    heat_map = cv2.resize(heat_map, (320 * 2, 320))
+    # heat_map = cv2.resize(heat_map, (320 * 2, 320))
 
     return show_boundary, heat_map

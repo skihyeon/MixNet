@@ -48,7 +48,10 @@ class myDataset(TextDataset):
 
     def load_img_gt(self, item):
         image_path = os.path.join(self.image_root, self.image_list[item])
-        image_id = image_path.split("/")[-1]
+        if os.name == 'nt':  # 윈도우일 경우
+            image_id = image_path.split("\\")[-1]
+        else:  # 리눅스일 경우
+            image_id = image_path.split("/")[-1]
 
         image = pil_load_img(image_path)
         try:

@@ -3,3 +3,6 @@
 /model
 /output
 /vis
+__pycache__/
+*.py[cod]
+*.pyc

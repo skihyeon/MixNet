@@ -17,7 +17,6 @@ from util.visualize import visualize_detection, visualize_gt
 from util.misc import mkdirs,rescale_result
 import multiprocessing
 from dataset.dataload import pil_load_img, TextDataset, TextInstance
-
 multiprocessing.set_start_method("spawn", force=True)
 
 
@@ -87,7 +86,7 @@ def inference(model, image_path, output_dir):
 
     # im_vis = np.concatenate([heat_map, show_boundary], axis=1)
     im_vis = np.concatenate([show_boundary], axis=1)
-    im_vis = cv2.resize(im_vis, (H, W))
+    
     path = os.path.join(output_dir, os.path.basename(image_path).split(".")[0] + '_infered.jpg')
     cv2.imwrite(path, im_vis)
 
@@ -100,6 +99,7 @@ def inference(model, image_path, output_dir):
     
     fname = path.replace('jpg', 'txt')
     write_to_file(contours, fname)
+    
 
 
 
