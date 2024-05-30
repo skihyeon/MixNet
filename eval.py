@@ -78,7 +78,10 @@ def inference(model, test_loader, output_dir):
             show_boundary = cv2.resize(show_boundary, (W, H))
             im_vis = np.concatenate([heat_map, gt_vis, show_boundary], axis=1)
 
+            _, buffer = cv2.imencode('.jpg', im_vis)    # 한글 경로 깨지는 경우 대비
             path = os.path.join(cfg.vis_dir, '{}_test'.format(cfg.exp_name), meta['image_id'][idx].split(".")[0]+".jpg")
+            with open(path, 'wb') as f:
+                f.write(buffer)
             cv2.imwrite(path, im_vis)
 
         contours = output_dict["py_preds"][-1].int().cpu().numpy()
@@ -104,7 +107,7 @@ def main(vis_dir_path):
     #     transform=BaseTransform(size=cfg.test_size, mean=cfg.means, std=cfg.stds)
     # )
     testset = myDataset(
-        data_root = 'data/hipass',
+        data_root = os.path.join('./data/', cfg.dataset_name),
         is_training=False,
         load_memory=cfg.load_memory,
         transform=BaseTransform(size=cfg.test_size, mean=cfg.means, std=cfg.stds)

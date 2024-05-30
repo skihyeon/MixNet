@@ -3,6 +3,7 @@
 /model
 /output
 /vis
+/infer_test_datas
 __pycache__/
 *.py[cod]
 *.pyc

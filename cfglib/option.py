@@ -29,6 +29,8 @@ class BaseOptions(object):
         # basic opts
         self.parser.add_argument('--exp_name', default="Test", type=str, help='Experiment name')
         self.parser.add_argument('--resume', default=None, type=str, help='Path to target resume checkpoint')
+        self.parser.add_argument('--dataset_name', default=None, type=str, help='dataset_name, under ./data/')
+
         self.parser.add_argument('--num_workers', default=0, type=int, help='Number of workers used in dataloading')
         self.parser.add_argument('--cuda', default=True, type=str2bool, help='Use cuda to train model')
         self.parser.add_argument('--mgpu', action='store_true', help='Use multi-gpu to train model')
@@ -39,8 +41,8 @@ class BaseOptions(object):
         # self.parser.add_argument('--input_channel', default=1, type=int, help='number of input channels' )
         self.parser.add_argument('--pretrain', default=False, type=str2bool, help='Pretrained AutoEncoder model')
         self.parser.add_argument('--verbose', '-v', default=True, type=str2bool, help='Whether to output debug info')
-        self.parser.add_argument('--viz', default=True, help='Whether to output debug info')
-        # self.parser.add_argument('--viz', default=True, type=str2bool, help='Whether to output debug info')
+        # self.parser.add_argument('--viz', default=True, help='Whether to output debug info')
+        self.parser.add_argument('--viz', default=True, type=str2bool, help='Whether to output debug info')
 
         # train opts
         self.parser.add_argument('--max_epoch', default=1, type=int, help='Max epochs')
