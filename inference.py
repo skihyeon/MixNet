@@ -137,7 +137,7 @@ def main(image_path):
     with torch.no_grad():
         print('Start infer MixNet.')
         if os.path.isdir(image_path):
-            output_dir = image_path + + '/' + cfg.exp_name + '_result/'
+            output_dir = image_path + '/' + cfg.exp_name + '_result/'
             mkdirs(output_dir)
             inference_folder(model, image_path, output_dir)
         else:
