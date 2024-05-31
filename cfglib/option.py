@@ -85,6 +85,8 @@ class BaseOptions(object):
         # demo args
         self.parser.add_argument('--img_root', default=None,   type=str, help='Path to deploy images')
 
+        self.parser.add_argument('--infer_path', default=None, type=str, help='inferene image or folder path')
+
     def parse(self, fixed=None):
 
         if fixed is not None:

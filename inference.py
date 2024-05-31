@@ -150,5 +150,5 @@ if __name__ == "__main__":
     args = option.initialize()
 
     update_config(cfg, args)
-    image_path = 'C:/Users/ys/Desktop/sgh/MixNet/infer_test_datas/images'
+    image_path = cfg.infer_path
     main(image_path)
