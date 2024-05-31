@@ -22,7 +22,7 @@ def area_of_intersection(det_x, det_y, gt_x, gt_y):
 def iou(det_x, det_y, gt_x, gt_y):
     intersection_area = area_of_intersection(det_x, det_y, gt_x, gt_y)
     union_area = area_of_union(det_x, det_y, gt_x, gt_y)
-    log_to_file(f"Intersection: {intersection_area}, Union: {union_area}")
+    # log_to_file(f"Intersection: {intersection_area}, Union: {union_area}")
     if union_area == 0:
         return 0.0
     return intersection_area / union_area
@@ -34,7 +34,7 @@ def evaluate_iou(pred_contours, gt_contours):
     for i, gt in enumerate(gt_contours):
         for j, pred in enumerate(pred_contours):
             iou_value = iou(pred[:, 0], pred[:, 1], gt[:, 0], gt[:, 1])
-            log_to_file(f"iou between pred {j} and gt {i}: {iou_value}")
+            # log_to_file(f"iou between pred {j} and gt {i}: {iou_value}")
             iou_matrix[i, j] = iou_value
     row_ind, col_ind = linear_sum_assignment(-iou_matrix)
     iou_scores = iou_matrix[row_ind, col_ind]
