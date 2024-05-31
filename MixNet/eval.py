@@ -109,6 +109,8 @@ def inference(model, test_loader, output_dir):
         print('Index {} / {},  images: {}. / IoU: {:.2f} / Hit!: {:.2f}%'.format(i + 1, len(test_loader), meta['image_id'][idx], avg_iou, hit_rate*100))
 
     print("평균 IoU: {:.4f}, 평균 적중률: {:.2f}".format(np.mean(iou_scores), np.mean(hit_rates)))
+    with open(os.path.join(output_dir, "/result_IoU.txt"), 'w') as f:
+        f.write("평균 IoU: {:.4f}, 평균 적중률: {:.2f}".format(np.mean(iou_scores), np.mean(hit_rates)))
 
 
 
