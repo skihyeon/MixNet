@@ -109,7 +109,7 @@ def main():
     global lr
 
     trainset = myDataset(
-        data_root = 'data/hipass',
+        data_root = cfg.dataset_name,
         is_training=True,
         load_memory=cfg.load_memory,
         transform=Augmentation(size=cfg.input_size, mean=cfg.means, std=cfg.stds)
