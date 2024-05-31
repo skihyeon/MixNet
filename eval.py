@@ -6,8 +6,7 @@ import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
 import torch.utils.data as data
-from sklearn.metrics import f1_score, accuracy_score
-from dataset import TotalText, myDataset
+from dataset import myDataset
 from network.textnet import TextNet
 from cfglib.config import config as cfg, update_config
 
@@ -15,6 +14,8 @@ from cfglib.option import BaseOptions
 from util.augmentation import BaseTransform
 from util.visualize import visualize_detection, visualize_gt
 from util.misc import mkdirs,rescale_result
+from cal_IoU import evaluate_iou
+
 import multiprocessing
 multiprocessing.set_start_method("spawn", force=True)
 
@@ -39,6 +40,7 @@ def inference(model, test_loader, output_dir):
     total_time = 0.
     osmkdir(output_dir)
     device = torch.device("cuda")
+    iou_scores = []
 
     for i, (image, meta) in enumerate(test_loader):
         input_dict = dict()
@@ -59,8 +61,7 @@ def inference(model, test_loader, output_dir):
             fps = (i+1)/total_time
         else:
             fps = 0.0
-        print('detect {} / {} images: {}. ({:.2f} fps)'.format(i + 1, len(test_loader), meta['image_id'][idx], fps), end = '\r', flush = True)
-
+        
         img_show = image[idx].permute(1,2,0).cpu().numpy()
         img_show = ((img_show * cfg.stds + cfg.means) * 255).astype(np.uint8)
 
@@ -76,7 +77,8 @@ def inference(model, test_loader, output_dir):
             heat_map = cv2.resize(heat_map, (W, H))
             gt_vis = cv2.resize(gt_vis, (W, H))
             show_boundary = cv2.resize(show_boundary, (W, H))
-            im_vis = np.concatenate([heat_map, gt_vis, show_boundary], axis=1)
+            # im_vis = np.concatenate([heat_map, gt_vis, show_boundary], axis=1)
+            im_vis = np.concatenate([gt_vis, show_boundary], axis=1)
 
             _, buffer = cv2.imencode('.jpg', im_vis)    # 한글 경로 깨지는 경우 대비
             path = os.path.join(cfg.vis_dir, '{}_test'.format(cfg.exp_name), meta['image_id'][idx].split(".")[0]+".jpg")
@@ -95,7 +97,15 @@ def inference(model, test_loader, output_dir):
 
         fname = meta['image_id'][idx].replace('jpg', 'txt').replace('JPG', 'txt').replace('PNG', 'txt').replace('png', 'txt')
         write_to_file(contours, os.path.join(output_dir, fname))
+        
+        iou_score = evaluate_iou(contours, gt_contour)
+        iou_scores.extend(iou_score)
 
+        avg_iou = np.mean(iou_score)
+        # print('detect {} / {} images: {}. ({:.2f} fps) / 평균 IoU: {:.2f}'.format(i + 1, len(test_loader), meta['image_id'][idx], fps, avg_iou), end='\r', flush=True)
+        print('detect {} / {} images: {}. ({:.2f} fps) / 평균 IoU: {:.2f}'.format(i + 1, len(test_loader), meta['image_id'][idx], fps, avg_iou))
+
+    print("평균 IoU: {:.4f}".format(np.mean(iou_scores)))
 
 
 
