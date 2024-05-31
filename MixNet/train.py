@@ -115,9 +115,14 @@ def main():
         transform=Augmentation(size=cfg.input_size, mean=cfg.means, std=cfg.stds)
     )
 
-    train_loader = data.DataLoader(trainset, batch_size=cfg.batch_size,
-                                   shuffle=True, num_workers=cfg.num_workers,
-                                   pin_memory=True)
+    if os.name == 'nt':  # 윈도우일 경우
+        train_loader = data.DataLoader(trainset, batch_size=cfg.batch_size,
+                                       shuffle=True, num_workers=cfg.num_workers,
+                                       pin_memory=True, generator=torch.Generator(device='cuda'))
+    else:
+        train_loader = data.DataLoader(trainset, batch_size=cfg.batch_size,
+                                       shuffle=True, num_workers=cfg.num_workers,
+                                       pin_memory=True)
     
     model = TextNet(backbone=cfg.net, is_training=True)
     model = model.to(cfg.device)
