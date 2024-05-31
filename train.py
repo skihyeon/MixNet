@@ -99,10 +99,10 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch):
         if cfg.viz and (i % cfg.viz_freq == 0 and i > 0):
             visualize_network_output(output_dict, input_dict, mode='train')
 
-        if epoch % cfg.save_freq == 0:
-            save_model(model, epoch, scheduler.get_lr())
-
         tqdm.write(f'Training Loss: {losses.avg}')
+
+    if epoch % cfg.save_freq == 0:
+        save_model(model, epoch, scheduler.get_lr())
 
 
 def main():
