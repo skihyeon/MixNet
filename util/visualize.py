@@ -147,16 +147,16 @@ def visualize_detection(image, output_dict, meta=None, infer=None):
 
     im_show0 = image_show.copy()
     ## 추후 아랫 init_py 부분은 inference 시에는 삭제하도록 변경
-    if not infer:
-        for i, bpts in enumerate(init_py.astype(np.int32)):
-            cv2.drawContours(im_show0, [bpts.astype(np.int32)], -1, (255, 0, 255), 2)
-            for j, pp in enumerate(bpts):
-                if j == 0:
-                    cv2.circle(im_show0, (int(pp[0]), int(pp[1])), 2, (125, 125, 255), -1)
-                elif j == 1:
-                    cv2.circle(im_show0, (int(pp[0]), int(pp[1])), 2, (125, 255, 125), -1)
-                else:
-                    cv2.circle(im_show0, (int(pp[0]), int(pp[1])), 2, (255, 125, 125), -1)
+    # if not infer:
+    #     for i, bpts in enumerate(init_py.astype(np.int32)):
+    #         cv2.drawContours(im_show0, [bpts.astype(np.int32)], -1, (255, 0, 255), 2)
+    #         for j, pp in enumerate(bpts):
+    #             if j == 0:
+    #                 cv2.circle(im_show0, (int(pp[0]), int(pp[1])), 2, (125, 125, 255), -1)
+    #             elif j == 1:
+    #                 cv2.circle(im_show0, (int(pp[0]), int(pp[1])), 2, (125, 255, 125), -1)
+    #             else:
+    #                 cv2.circle(im_show0, (int(pp[0]), int(pp[1])), 2, (255, 125, 125), -1)
 
     # cv2.imwrite(path, im_show0)
 
