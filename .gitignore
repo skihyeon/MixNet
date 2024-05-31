@@ -1,9 +1,9 @@
-/data
-/infer_set
-/model
-/output
-/vis
-/infer_test_datas
+/MixNet/data
+/MixNet/infer_set
+/MixNet/model
+/MixNet/output
+/MixNet/vis
+/MixNet/infer_test_datas
 __pycache__/
 *.py[cod]
 *.pyc
