@@ -127,7 +127,7 @@ def visualize_gt(image, contours, label_tag):
     show_gt = image_show
     return show_gt
 
-def visualize_detection(image, output_dict, meta=None):
+def visualize_detection(image, output_dict, meta=None, infer=None):
     image_show = image.copy()
     image_show = np.ascontiguousarray(image_show[:, :, ::-1])
 
@@ -147,15 +147,16 @@ def visualize_detection(image, output_dict, meta=None):
 
     im_show0 = image_show.copy()
     ## 추후 아랫 init_py 부분은 inference 시에는 삭제하도록 변경
-    for i, bpts in enumerate(init_py.astype(np.int32)):
-        cv2.drawContours(im_show0, [bpts.astype(np.int32)], -1, (255, 0, 255), 2)
-        for j, pp in enumerate(bpts):
-            if j == 0:
-                cv2.circle(im_show0, (int(pp[0]), int(pp[1])), 3, (125, 125, 255), -1)
-            elif j == 1:
-                cv2.circle(im_show0, (int(pp[0]), int(pp[1])), 3, (125, 255, 125), -1)
-            else:
-                cv2.circle(im_show0, (int(pp[0]), int(pp[1])), 3, (255, 125, 125), -1)
+    if not infer:
+        for i, bpts in enumerate(init_py.astype(np.int32)):
+            cv2.drawContours(im_show0, [bpts.astype(np.int32)], -1, (255, 0, 255), 2)
+            for j, pp in enumerate(bpts):
+                if j == 0:
+                    cv2.circle(im_show0, (int(pp[0]), int(pp[1])), 3, (125, 125, 255), -1)
+                elif j == 1:
+                    cv2.circle(im_show0, (int(pp[0]), int(pp[1])), 3, (125, 255, 125), -1)
+                else:
+                    cv2.circle(im_show0, (int(pp[0]), int(pp[1])), 3, (255, 125, 125), -1)
 
     # cv2.imwrite(path, im_show0)
 
