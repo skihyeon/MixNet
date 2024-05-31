@@ -82,7 +82,7 @@ def inference(model, image_path, output_dir):
     img_show = image.transpose(1, 2, 0)
     img_show = ((img_show * cfg.stds + cfg.means) * 255).astype(np.uint8)
 
-    show_boundary, heat_map = visualize_detection(img_show, output_dict, meta=meta)
+    show_boundary, heat_map = visualize_detection(img_show, output_dict, meta=meta, infer=True)
 
     # im_vis = np.concatenate([heat_map, show_boundary], axis=1)
     im_vis = np.concatenate([show_boundary], axis=1)
