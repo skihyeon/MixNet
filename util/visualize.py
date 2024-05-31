@@ -152,11 +152,11 @@ def visualize_detection(image, output_dict, meta=None, infer=None):
             cv2.drawContours(im_show0, [bpts.astype(np.int32)], -1, (255, 0, 255), 2)
             for j, pp in enumerate(bpts):
                 if j == 0:
-                    cv2.circle(im_show0, (int(pp[0]), int(pp[1])), 3, (125, 125, 255), -1)
+                    cv2.circle(im_show0, (int(pp[0]), int(pp[1])), 2, (125, 125, 255), -1)
                 elif j == 1:
-                    cv2.circle(im_show0, (int(pp[0]), int(pp[1])), 3, (125, 255, 125), -1)
+                    cv2.circle(im_show0, (int(pp[0]), int(pp[1])), 2, (125, 255, 125), -1)
                 else:
-                    cv2.circle(im_show0, (int(pp[0]), int(pp[1])), 3, (255, 125, 125), -1)
+                    cv2.circle(im_show0, (int(pp[0]), int(pp[1])), 2, (255, 125, 125), -1)
 
     # cv2.imwrite(path, im_show0)
 
@@ -167,15 +167,15 @@ def visualize_detection(image, output_dict, meta=None, infer=None):
         for ppts in contours:
             for j, pp in enumerate(ppts):
                 if j == 0:
-                    cv2.circle(im_show, (int(pp[0]), int(pp[1])), 3, (125, 125, 255), -1)
+                    cv2.circle(im_show, (int(pp[0]), int(pp[1])), 2, (125, 125, 255), -1)
                 elif j == 1:
-                    cv2.circle(im_show, (int(pp[0]), int(pp[1])), 3, (125, 255, 125), -1)
+                    cv2.circle(im_show, (int(pp[0]), int(pp[1])), 2, (125, 255, 125), -1)
                 else:
-                    cv2.circle(im_show, (int(pp[0]), int(pp[1])), 3, (255, 125, 125), -1)
+                    cv2.circle(im_show, (int(pp[0]), int(pp[1])), 2, (255, 125, 125), -1)
         if cfg.mid:
             for ppt in midline:
                 for pt in ppt:
-                    cv2.circle(im_show, (int(pt[0]), int(pt[1])), 3, (255, 0, 0), -1)
+                    cv2.circle(im_show, (int(pt[0]), int(pt[1])), 2, (255, 0, 0), -1)
 
         path = os.path.join(cfg.vis_dir, '{}_test'.format(cfg.exp_name),
                              meta['image_id'][0].split(".")[0] + "_{}iter.png".format(idx))
