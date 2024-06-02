@@ -118,7 +118,7 @@ def main():
     if os.name == 'nt':  # 윈도우일 경우
         train_loader = data.DataLoader(trainset, batch_size=cfg.batch_size,
                                        shuffle=True, num_workers=cfg.num_workers,
-                                       pin_memory=True, generator=torch.Generator(device='cuda'))
+                                       pin_memory=True, generator=torch.Generator(cfg.device))
     else:
         train_loader = data.DataLoader(trainset, batch_size=cfg.batch_size,
                                        shuffle=True, num_workers=cfg.num_workers,
