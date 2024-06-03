@@ -106,7 +106,7 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch):
 
 def main():
     global lr
-
+    torch.cuda.set_device(cfg.device)
     trainset = AllDataset(config=cfg, custom_data_root="./data/kor", open_data_root="./data/open_datas", is_training=True)
 
     if os.name == 'nt':  # 윈도우일 경우
@@ -122,7 +122,7 @@ def main():
     model = model.to(cfg.device)
     criterion = TextLoss()
 
-    torch.cuda.set_device(cfg.device)
+    
     if cfg.mgpu:
         model = nn.DataParallel(model, device_ids=[int(i) for i in cfg.device_ids])
 
