@@ -1,5 +1,4 @@
 import os
-import gc
 import time
 import torch
 import numpy as np
@@ -11,7 +10,6 @@ from torch.optim import lr_scheduler
 from dataset.concat_datasets import AllDataset
 from network.loss import TextLoss, knowledge_loss
 from network.textnet import TextNet
-from util.augmentation import Augmentation
 from cfglib.config import config as cfg, update_config, print_config
 from util.misc import AverageMeter
 from util.misc import mkdirs, to_device
@@ -19,6 +17,8 @@ from util.visualize import visualize_network_output
 from cfglib.option import BaseOptions
 
 from tqdm.auto import tqdm
+from torch.utils.tensorboard import SummaryWriter
+
 
 def save_model(model, epoch, lr):
     save_dir = os.path.join(cfg.save_dir, cfg.exp_name)
@@ -65,7 +65,9 @@ def _parse_data(inputs):
     return input_dict
 
 
-def train(model, train_loader, criterion, scheduler, optimizer, epoch):
+
+
+def train(model, train_loader, criterion, scheduler, optimizer, epoch, writer):
     global train_step
 
     losses = AverageMeter()
@@ -99,6 +101,7 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch):
             visualize_network_output(output_dict, input_dict, mode='train')
 
         tqdm.write(f'Training Loss: {losses.avg}')
+        writer.add_scalar('Loss/train', losses.avg, epoch * len(train_loader) + i)
 
     if epoch % cfg.save_freq == 0:
         save_model(model, epoch, scheduler.get_lr())
@@ -122,7 +125,8 @@ def main():
     model = model.to(cfg.device)
     criterion = TextLoss()
 
-    
+    writer = SummaryWriter(log_dir=os.path.join(cfg.save_dir, cfg.exp_name, 'logs'))
+
     if cfg.mgpu:
         model = nn.DataParallel(model, device_ids=[int(i) for i in cfg.device_ids])
 
@@ -140,8 +144,9 @@ def main():
     print('Start training MixNet.')
     for epoch in range(cfg.start_epoch, cfg.max_epoch+1):
         scheduler.step()
-        train(model, train_loader, criterion, scheduler, optimizer, epoch)
+        train(model, train_loader, criterion, scheduler, optimizer, epoch, writer)
 
+    writer.close()
     print('End.')
 
     if torch.cuda.is_available():
