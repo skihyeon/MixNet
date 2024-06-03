@@ -98,19 +98,21 @@ def inference(model, test_loader, output_dir):
         fname = meta['image_id'][idx].replace('jpg', 'txt').replace('JPG', 'txt').replace('PNG', 'txt').replace('png', 'txt')
         write_to_file(contours, os.path.join(output_dir, fname))
         
-        iou_score = evaluate_iou(contours, gt_contour)
-        iou_scores.extend(iou_score)
+        # iou_score = evaluate_iou(contours, gt_contour)
+        # iou_scores.extend(iou_score)
 
-        avg_iou = np.mean(iou_score)
+        # avg_iou = np.mean(iou_score)
 
         hit_rate = len(contours)/len(gt_contour)
         hit_rates.append(hit_rate)
         # print('detect {} / {} images: {}. ({:.2f} fps) / 평균 IoU: {:.2f}'.format(i + 1, len(test_loader), meta['image_id'][idx], fps, avg_iou), end='\r', flush=True)
-        print('Index {} / {},  images: {}. / IoU: {:.2f} / Hit!: {:.2f}%'.format(i + 1, len(test_loader), meta['image_id'][idx], avg_iou, hit_rate*100))
-
-    print("평균 IoU: {:.4f}, 평균 적중률: {:.2f}".format(np.mean(iou_scores), np.mean(hit_rates)))
-    with open(os.path.join(output_dir, "/result_IoU.txt"), 'w') as f:
-        f.write("평균 IoU: {:.4f}, 평균 적중률: {:.2f}".format(np.mean(iou_scores), np.mean(hit_rates)))
+        # print('Index {} / {},  images: {}. / IoU: {:.2f} / Hit!: {:.2f}%'.format(i + 1, len(test_loader), meta['image_id'][idx], avg_iou, hit_rate*100))
+        print('Index {} / {},  images: {}. / Hit!: {:.2f}%'.format(i + 1, len(test_loader), meta['image_id'][idx], hit_rate*100))
+        
+    print("평균 적중률: {:.2f}".format(np.mean(hit_rates)))
+    # print("평균 IoU: {:.4f}, 평균 적중률: {:.2f}".format(np.mean(iou_scores), np.mean(hit_rates)))
+    # with open(os.path.join(output_dir, "/result_IoU.txt"), 'w') as f:
+        # f.write("평균 IoU: {:.4f}, 평균 적중률: {:.2f}".format(np.mean(iou_scores), np.mean(hit_rates)))
 
 
 
