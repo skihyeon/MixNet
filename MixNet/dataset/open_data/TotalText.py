@@ -3,6 +3,7 @@ warnings.filterwarnings("ignore")
 import sys
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 import re
 import numpy as np
 import scipy.io as io
@@ -124,7 +125,7 @@ if __name__ == '__main__':
     )
 
     trainset = TotalText(
-        data_root='C:/Users/ys/Desktop/sgh/MixNet_mine/dataset/totaltext',
+        data_root='../../data/open_datas/totaltext',
         ignore_list=None,
         is_training=True,
         transform=transform
