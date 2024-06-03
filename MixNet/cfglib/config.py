@@ -74,9 +74,9 @@ def update_config(config, extra_config):
         config[k] = v
     # print(config.gpu)
     if config.cuda and torch.cuda.device_count() > 1:
-        config.device = torch.device('cuda:2,3')
+        config.device = torch.device('cuda:1')
     else:
-        config.device = torch.device('cuda') if config.cuda else torch.device('cpu')
+        config.device = torch.device('cuda:0') if config.cuda else torch.device('cpu')
 
 
 def print_config(config):
