@@ -116,14 +116,16 @@ def main():
     else:
         train_loader = data.DataLoader(trainset, batch_size=cfg.batch_size,
                                        shuffle=True, num_workers=cfg.num_workers,
-                                       pin_memory=True)
+                                       pin_memory=True, generator=torch.Generator(device=cfg.device))
     
     model = TextNet(backbone=cfg.net, is_training=True)
     model = model.to(cfg.device)
     criterion = TextLoss()
 
+    torch.cuda.set_device(cfg.device)
     if cfg.mgpu:
-        model = nn.DataParallel(model)
+        model = nn.DataParallel(model, device_ids=[int(i) for i in cfg.device_ids])
+
     if cfg.cuda:
         cudnn.benchmark = True
     if cfg.resume:
