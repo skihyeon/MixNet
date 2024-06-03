@@ -1,24 +1,20 @@
 import os
-import time
 import cv2
 import numpy as np
-
 import torch
 import torch.backends.cudnn as cudnn
-import torch.utils.data as data
+import multiprocessing
 
-from dataset import TotalText, myDataset
+from dataset import myDataset
+from dataset.dataload import pil_load_img, TextDataset
 from network.textnet import TextNet
 from cfglib.config import config as cfg, update_config
-
 from cfglib.option import BaseOptions
-from util.augmentation import BaseTransform, BaseTransformNresize
-from util.visualize import visualize_detection, visualize_gt
-from util.misc import mkdirs,rescale_result
-import multiprocessing
-from dataset.dataload import pil_load_img, TextDataset, TextInstance
-multiprocessing.set_start_method("spawn", force=True)
+from util.augmentation import BaseTransform
+from util.visualize import visualize_detection
+from util.misc import mkdirs, rescale_result
 
+multiprocessing.set_start_method("spawn", force=True)
 
     
 def write_to_file(contours, file_path):
@@ -111,21 +107,6 @@ def inference_folder(model, folder_path, output_dir):
             inference(model, image_path, output_dir)
 
 
-
-# def main(image_path):
-#     cudnn.benchmark = False
-#     model = TextNet(is_training=False, backbone=cfg.net)
-#     model_path = os.path.join(cfg.save_dir, cfg.exp_name,
-#                               'MixNet_{}_{}.pth'.format(model.backbone_name, cfg.checkepoch))
-#     model.load_model(model_path)
-#     model.to(torch.device("cuda"))
-#     model.eval()
-#     with torch.no_grad():
-#         print('Start infer MixNet.')
-#         output_dir = os.path.dirname(image_path) 
-#         inference(model, image_path, output_dir)
-
-
 def main(image_path):
     cudnn.benchmark = False
     model = TextNet(is_training=False, backbone=cfg.net)
@@ -136,11 +117,11 @@ def main(image_path):
     model.eval()
     with torch.no_grad():
         print('Start infer MixNet.')
-        if os.path.isdir(image_path):
+        if os.path.isdir(image_path): ## 폴더 입력 시 해당 폴더 내 모든 이미지 처리
             output_dir = image_path + '/' + cfg.exp_name + '_result/'
             mkdirs(output_dir)
             inference_folder(model, image_path, output_dir)
-        else:
+        else: ## 이미지 파일 입력 시 해당 이미지 처리
             output_dir = os.path.dirname(image_path)
             inference(model, image_path, output_dir)    
 

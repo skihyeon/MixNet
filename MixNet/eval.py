@@ -11,7 +11,6 @@ from network.textnet import TextNet
 from cfglib.config import config as cfg, update_config
 
 from cfglib.option import BaseOptions
-from util.augmentation import BaseTransform
 from util.visualize import visualize_detection, visualize_gt
 from util.misc import mkdirs,rescale_result
 from cal_IoU import evaluate_iou
