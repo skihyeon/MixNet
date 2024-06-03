@@ -52,7 +52,7 @@ def vis_direction_field(gt_flux):
     im2 = ax2.imshow(angle_gt, cmap=cm.jet)
     plt.colorbar(im2, shrink=0.5)
 
-    plt.savefig('1.png')
+    # plt.savefig('1.png')
     plt.close(fig)
 
 

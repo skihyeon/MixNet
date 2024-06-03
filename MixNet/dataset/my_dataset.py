@@ -103,7 +103,7 @@ if __name__ == '__main__':
     transform = lambda img, polygons=None: ((img / 255.0 - means) / stds, polygons)
 
     trainset = myDataset(
-        data_root='data/hipass',
+        data_root='../data/kor',
         is_training=True,
         transform=transform,
     )
