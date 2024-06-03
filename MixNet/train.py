@@ -112,10 +112,12 @@ def main():
     torch.cuda.set_device(cfg.device)
     trainset = AllDataset(config=cfg, custom_data_root="./data/kor", open_data_root="./data/open_datas", is_training=True)
 
-    if os.name == 'nt':  # 윈도우일 경우
+
+
+    if cfg.server_code == 24:       ## 24 서버 Torch 버전 문제로 인해 Generator 호환 X
         train_loader = data.DataLoader(trainset, batch_size=cfg.batch_size,
                                        shuffle=True, num_workers=cfg.num_workers,
-                                       pin_memory=True, generator=torch.Generator(cfg.device))
+                                       pin_memory=True)
     else:
         train_loader = data.DataLoader(trainset, batch_size=cfg.batch_size,
                                        shuffle=True, num_workers=cfg.num_workers,
