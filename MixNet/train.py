@@ -122,10 +122,9 @@ def main():
     model = model.to(cfg.device)
     criterion = TextLoss()
 
+    torch.cuda.set_device(cfg.device)
     if cfg.mgpu:
         model = nn.DataParallel(model, device_ids=[int(i) for i in cfg.device_ids])
-    else:
-        torch.cuda.set_device(cfg.device)
 
     if cfg.cuda:
         cudnn.benchmark = True
