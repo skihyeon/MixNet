@@ -6,7 +6,7 @@ import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
 import torch.utils.data as data
-from dataset import myDataset
+from dataset.concat_datasets import AllDataset
 from network.textnet import TextNet
 from cfglib.config import config as cfg, update_config
 
@@ -108,7 +108,7 @@ def inference(model, test_loader, output_dir):
         # print('detect {} / {} images: {}. ({:.2f} fps) / 평균 IoU: {:.2f}'.format(i + 1, len(test_loader), meta['image_id'][idx], fps, avg_iou), end='\r', flush=True)
         # print('Index {} / {},  images: {}. / IoU: {:.2f} / Hit!: {:.2f}%'.format(i + 1, len(test_loader), meta['image_id'][idx], avg_iou, hit_rate*100))
         print('Index {} / {},  images: {}. / Hit!: {:.2f}%'.format(i + 1, len(test_loader), meta['image_id'][idx], hit_rate*100))
-        
+
     print("평균 적중률: {:.2f}".format(np.mean(hit_rates)))
     # print("평균 IoU: {:.4f}, 평균 적중률: {:.2f}".format(np.mean(iou_scores), np.mean(hit_rates)))
     # with open(os.path.join(output_dir, "/result_IoU.txt"), 'w') as f:
@@ -123,12 +123,7 @@ def main(vis_dir_path):
     #     load_memory=cfg.load_memory,
     #     transform=BaseTransform(size=cfg.test_size, mean=cfg.means, std=cfg.stds)
     # )
-    testset = myDataset(
-        data_root = os.path.join('./data/', cfg.dataset_name),
-        is_training=False,
-        load_memory=cfg.load_memory,
-        transform=BaseTransform(size=cfg.test_size, mean=cfg.means, std=cfg.stds)
-    )
+    testset = AllDataset(config=cfg, custom_data_root="./data/kor", open_data_root="./data/open_datas", is_training=False)
     cudnn.benchmark = False
     test_loader = data.DataLoader(testset, batch_size=1, shuffle=False, num_workers=cfg.num_workers)
     model = TextNet(is_training=False, backbone=cfg.net)
