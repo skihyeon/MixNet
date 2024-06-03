@@ -7,9 +7,8 @@ import torch.nn as nn
 import torch.backends.cudnn as cudnn
 import torch.utils.data as data
 from torch.optim import lr_scheduler
-from torch.utils.data import ConcatDataset
 
-from dataset import TotalText, myDataset
+from dataset.concat_datasets import AllDataset
 from network.loss import TextLoss, knowledge_loss
 from network.textnet import TextNet
 from util.augmentation import Augmentation
@@ -108,12 +107,7 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch):
 def main():
     global lr
 
-    trainset = myDataset(
-        data_root = os.path.join('./data/', cfg.dataset_name),
-        is_training=True,
-        load_memory=cfg.load_memory,
-        transform=Augmentation(size=cfg.input_size, mean=cfg.means, std=cfg.stds)
-    )
+    trainset = AllDataset(config=cfg, custom_data_root="./data/kor", open_data_root="./data/open_datas", is_training=True)
 
     if os.name == 'nt':  # 윈도우일 경우
         train_loader = data.DataLoader(trainset, batch_size=cfg.batch_size,

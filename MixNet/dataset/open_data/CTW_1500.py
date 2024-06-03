@@ -8,6 +8,7 @@ import numpy as np
 from dataload import pil_load_img, TextDataset, TextInstance
 from util.io import read_lines
 import cv2
+from lxml import etree as ET
 
 class CTW_1500(TextDataset):
     def __init__(self, data_root, is_training=True, load_memory=False, transform=None):
@@ -16,8 +17,8 @@ class CTW_1500(TextDataset):
         self.is_training = is_training
         self.load_memory = load_memory
         
-        self.image_root = os.path.join(data_root, 'train' if is_training else 'test', "text_image")
-        self.annotation_root = os.path.join(data_root, 'train' if is_training else 'test', "text_label_circum")
+        self.image_root = os.path.join(data_root, 'train' if is_training else 'test', "images")
+        self.annotation_root = os.path.join(data_root, 'train' if is_training else 'test', "labels")
         self.image_list = os.listdir(self.image_root)
         self.annotation_list = ['{}'.format(img_name.replace('.jpg', '')) for img_name in self.image_list]
 
@@ -26,17 +27,33 @@ class CTW_1500(TextDataset):
             for item in range(len(self.image_list)):
                 self.datas.append(self.load_img_gt(item))
 
+    @staticmethod
     def parse_carve_text(gt_path):
-        lines = read_lines(gt_path + '.txt')
+        lines = read_lines(gt_path + ".txt")
         polygons = []
         for line in lines:
-            gt = list(map(int, line.split(',')))
-            pts = np.stack(gt[4::2], gt[5::2]).T.astype(np.int32)
+            line = line.split(",")
+            gt = list(map(int, line[:-1]))
+            pts = np.stack([gt[0::2], gt[1::2]]).T.astype(np.int32)
+            label = line[-1].split("###")[-1].replace("###", "#")
+            # label = line[-1]
+            polygons.append(TextInstance(pts, 'c', label))
 
-            pts[:,0] = pts[:,0] + gt[0]
-            pts[:,1] = pts[:,1] + gt[1]
-            polygons.append(TextInstance(pts, 'c', "**"))
-        
+        return polygons
+    
+    @staticmethod
+    def parse_carve_xml(gt_path):
+
+        root = ET.parse(gt_path + ".xml").getroot()
+
+        polygons = []
+        for tag in root.findall('image/box'):
+            label = tag.find("label").text.replace("###", "#")
+            gt = list(map(int, tag.find("segs").text.split(",")))
+            pts = np.stack([gt[0::2], gt[1::2]]).T.astype(np.int32)
+
+            polygons.append(TextInstance(pts, 'c', label))
+
         return polygons
     
     def load_img_gt(self, item):
@@ -49,9 +66,15 @@ class CTW_1500(TextDataset):
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         image = np.array(image)
 
-        annotation_id = self.annotation_list[item]
-        annotation_path = os.path.join(self.annotation_root, annotation_id)
-        polygons = self.parse_carve_txt(annotation_path)
+        if self.is_training:
+            annotation_id = self.annotation_list[item]
+            annotation_path = os.path.join(self.annotation_root, annotation_id)
+            polygons = self.parse_carve_xml(annotation_path)
+            pass
+        else:
+            annotation_id = self.annotation_list[item]
+            annotation_path = os.path.join(self.annotation_root, "000" + annotation_id)
+            polygons = self.parse_carve_txt(annotation_path)
 
         data = dict()
         data["image"] = image
@@ -63,7 +86,6 @@ class CTW_1500(TextDataset):
     
 
     def __getitem__(self, item):
-
         if self.load_memory:
             data = self.datas[item]
         else:
@@ -81,8 +103,6 @@ class CTW_1500(TextDataset):
 
 if __name__ == '__main__':
     from util.augmentation import Augmentation
-    from util.misc import regularize_sin_cos
-    from util.pbox import bbox_transfor_inv, minConnectPath
     from util import canvas as cav
     import time
 
@@ -94,77 +114,44 @@ if __name__ == '__main__':
     )
 
     trainset = CTW_1500(
-        data_root='../data/ctw1500',
+        data_root='../../data/open_datas/ctw1500',
         is_training=True,
         transform=transform
     )
 
-    # img, train_mask, tr_mask, tcl_mask, radius_map, sin_map, cos_map, meta = trainset[944]
     for idx in range(0, len(trainset)):
         t0 = time.time()
-        img, train_mask, tr_mask, tcl_mask, radius_map, sin_map, cos_map, gt_roi = trainset[idx]
-        img, train_mask, tr_mask, tcl_mask, radius_map, sin_map, cos_map, gt_roi \
-            = map(lambda x: x.cpu().numpy(), (img, train_mask, tr_mask, tcl_mask, radius_map, sin_map, cos_map, gt_roi))
+        img, train_mask, tr_mask, distance_field, \
+        direction_field, weight_matrix, ctrl_points, proposal_points, ignore_tags,_ = trainset[idx]
+        img, train_mask, tr_mask, distance_field, \
+        direction_field, weight_matrix, ctrl_points, proposal_points, ignore_tags,\
+            = map(lambda x: x.cpu().numpy(),
+                  (img, train_mask, tr_mask, distance_field,
+                   direction_field, weight_matrix, ctrl_points, proposal_points, ignore_tags))
 
         img = img.transpose(1, 2, 0)
         img = ((img * stds + means) * 255).astype(np.uint8)
-        print(idx, img.shape)
-        top_map = radius_map[:, :, 0]
-        bot_map = radius_map[:, :, 1]
 
-        print(radius_map.shape)
 
-        sin_map, cos_map = regularize_sin_cos(sin_map, cos_map)
-        ret, labels = cv2.connectedComponents(tcl_mask[:, :, 0].astype(np.uint8), connectivity=8)
-        cv2.imshow("labels0", cav.heatmap(np.array(labels * 255 / np.max(labels), dtype=np.uint8)))
-        print(np.sum(tcl_mask[:, :, 1]))
+        boundary_point = ctrl_points[np.where(ignore_tags != 0)[0]]
+        for i, bpts in enumerate(boundary_point):
+            cv2.drawContours(img, [bpts.astype(np.int32)], -1, (0, 255, 0), 1)
+            for j, pp in enumerate(bpts):
+                if j == 0:
+                    cv2.circle(img, (int(pp[0]), int(pp[1])), 2, (255, 0, 255), -1)
+                elif j == 1:
+                    cv2.circle(img, (int(pp[0]), int(pp[1])), 2, (0, 255, 255), -1)
+                else:
+                    cv2.circle(img, (int(pp[0]), int(pp[1])), 2, (0, 0, 255), -1)
 
-        t0 = time.time()
-        for bbox_idx in range(1, ret):
-            bbox_mask = labels == bbox_idx
-            text_map = tcl_mask[:, :, 0] * bbox_mask
-
-            boxes = bbox_transfor_inv(radius_map, sin_map, cos_map, text_map, wclip=(2, 8))
-            # nms
-            boxes = lanms.merge_quadrangle_n9(boxes.astype('float32'), 0.25)
-            boxes = boxes[:, :8].reshape((-1, 4, 2)).astype(np.int32)
-            if boxes.shape[0] > 1:
-                center = np.mean(boxes, axis=1).astype(np.int32).tolist()
-                paths, routes_path = minConnectPath(center)
-                boxes = boxes[routes_path]
-                top = np.mean(boxes[:, 0:2, :], axis=1).astype(np.int32).tolist()
-                bot = np.mean(boxes[:, 2:4, :], axis=1).astype(np.int32).tolist()
-
-                boundary_point = top + bot[::-1]
-                # for index in routes:
-
-                for ip, pp in enumerate(top):
-                    if ip == 0:
-                        color = (0, 255, 255)
-                    elif ip == len(top) - 1:
-                        color = (255, 255, 0)
-                    else:
-                        color = (0, 0, 255)
-                    cv2.circle(img, (int(pp[0]), int(pp[1])), 2, color, -1)
-                for ip, pp in enumerate(bot):
-                    if ip == 0:
-                        color = (0, 255, 255)
-                    elif ip == len(top) - 1:
-                        color = (255, 255, 0)
-                    else:
-                        color = (0, 255, 0)
-                    cv2.circle(img, (int(pp[0]), int(pp[1])), 2, color, -1)
-                cv2.drawContours(img, [np.array(boundary_point)], -1, (0, 255, 255), 1)
-        # print("nms time: {}".format(time.time() - t0))
-        # # cv2.imshow("", img)
-        # # cv2.waitKey(0)
-
-        # print(meta["image_id"])
-        cv2.imshow('imgs', img)
-        cv2.imshow("", cav.heatmap(np.array(labels * 255 / np.max(labels), dtype=np.uint8)))
-        cv2.imshow("tr_mask", cav.heatmap(np.array(tr_mask * 255 / np.max(tr_mask), dtype=np.uint8)))
-        cv2.imshow("tcl_mask",
-                   cav.heatmap(np.array(tcl_mask[:, :, 1] * 255 / np.max(tcl_mask[:, :, 1]), dtype=np.uint8)))
-        # cv2.imshow("top_map", cav.heatmap(np.array(top_map * 255 / np.max(top_map), dtype=np.uint8)))
-        # cv2.imshow("bot_map", cav.heatmap(np.array(bot_map * 255 / np.max(bot_map), dtype=np.uint8)))
-        cv2.waitKey(0)
+            ppts = proposal_points[i]
+            cv2.drawContours(img, [ppts.astype(np.int32)], -1, (0, 0, 255), 1)
+            for j, pp in enumerate(ppts):
+                if j == 0:
+                    cv2.circle(img, (int(pp[0]), int(pp[1])), 2, (255, 0, 255), -1)
+                elif j == 1:
+                    cv2.circle(img, (int(pp[0]), int(pp[1])), 2, (0, 255, 255), -1)
+                else:
+                    cv2.circle(img, (int(pp[0]), int(pp[1])), 2, (0, 0, 255), -1)
+            cv2.imshow('imgs', img)
+            cv2.waitKey(0)

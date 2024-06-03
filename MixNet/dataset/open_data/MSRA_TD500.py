@@ -21,12 +21,12 @@ class MSRA_TD500(TextDataset):
         gt_check = re.compile('.gt')
 
         if is_training:
-            data_root = os.path.join(self.data_root, 'MSRA-TD500/train')
+            data_root = os.path.join(self.data_root, 'train')
             fnames = os.listdir(data_root)
             self.image_list = self.image_list + sorted([os.path.join(data_root, fname) for fname in fnames if img_check.findall(fname)])
             self.anno_list = self.anno_list + sorted([os.path.join(data_root, fname) for fname in fnames if gt_check.findall(fname)])
         else:
-            data_root = os.path.join(data_root, 'MSRA-TD500/test/')
+            data_root = os.path.join(data_root, 'test')
             fnames = os.listdir(data_root)
             self.image_list = self.image_list + sorted([os.path.join(data_root, fname) for fname in fnames if img_check.findall(fname)])
             self.anno_list = self.anno_list + sorted([os.path.join(data_root, fname) for fname in fnames if gt_check.findall(fname)])
