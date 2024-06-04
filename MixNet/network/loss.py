@@ -10,14 +10,11 @@ import pytorch_ssim
 
 
 class TextLoss(nn.Module):
-
     def __init__(self):
         super().__init__()
         self.MSE_loss = torch.nn.MSELoss(reduce=False, size_average=False)
         self.BCE_loss = torch.nn.BCELoss(reduce=False, size_average=False)
         self.PolyMatchingLoss = PolyMatchingLoss(cfg.num_points, cfg.device)
-        if cfg.mid:
-            self.midPolyMatchingLoss = PolyMatchingLoss(cfg.num_points // 2, cfg.device)
         self.ssim = pytorch_ssim.SSIM()
         self.overlap_loss = overlap_loss()
 
@@ -68,7 +65,6 @@ class TextLoss(nn.Module):
 
     @staticmethod
     def loss_calc_flux(pred_flux, gt_flux, weight_matrix, mask, train_mask):
-
         gt_flux = 0.999999 * gt_flux / (gt_flux.norm(p=2, dim=1).unsqueeze(1) + 1e-3)
         norm_loss = weight_matrix * torch.mean((pred_flux - gt_flux) ** 2, dim=1)*train_mask
         norm_loss = norm_loss.sum(-1).mean()
@@ -159,60 +155,27 @@ class TextLoss(nn.Module):
             weight_matrix = F.interpolate(weight_matrix.unsqueeze(1),
                                           scale_factor=1/cfg.scale, mode='bilinear').squeeze()
 
-        # pixel class loss
         cls_loss = self.BCE_loss(fy_preds[:, 0, :, :],  conf)
         cls_loss = torch.mul(cls_loss, train_mask).mean()
 
-        # distance field loss
         dis_loss = self.MSE_loss(fy_preds[:, 1, :, :], distance_field)
         dis_loss = torch.mul(dis_loss, train_mask)
         dis_loss = self.single_image_loss(dis_loss, distance_field)
 
-        # # direction field loss
         train_mask = train_mask > 0
         norm_loss, angle_loss = self.loss_calc_flux(fy_preds[:, 2:4, :, :], direction_field, weight_matrix, tr_mask, train_mask)
 
-        if cfg.onlybackbone:
-            alpha = 1.0; beta = 3.0; theta=0.5
-            loss = alpha*cls_loss + beta*(dis_loss) + theta*(norm_loss + angle_loss)
-            loss_dict = {
-                'total_loss': loss,
-                'cls_loss': alpha*cls_loss,
-                'distance loss': beta*dis_loss,
-                'dir_loss': theta*(norm_loss + angle_loss),
-                'norm_loss': theta*norm_loss,
-            }
-            return loss_dict
-
-        # boundary point loss
         point_loss = self.PolyMatchingLoss(py_preds[1:], gt_tags[inds])
-        if cfg.mid:
-            midline = output_dict["midline"]
-            gt_midline = input_dict['gt_mid_points']
-            midline_loss = 0.5*self.midPolyMatchingLoss(midline, gt_midline[inds])
 
-        if cfg.embed:# or cfg.mid:
-            embed = output_dict["embed"]
-            edge_field = input_dict['edge_field'].float()
-            embed_loss = self.overlap_loss(embed, conf, instance, edge_field, inds)
-
-
-
-        #  Minimum energy loss regularization
         h, w = distance_field.size(1) * cfg.scale, distance_field.size(2) * cfg.scale
         energy_loss = self.loss_energy_regularization(distance_field, py_preds, inds[0], h, w)
 
-        alpha = 1.0; beta = 3.0; theta=0.5; embed_ratio = 0.5
+        alpha = 1.0; beta = 3.0; theta=0.5; 
         if eps is None:
             gama = 0.05; 
         else:
             gama = 0.1*torch.sigmoid(torch.tensor((eps - cfg.max_epoch)/cfg.max_epoch))
         loss = alpha*cls_loss + beta*(dis_loss) + theta*(norm_loss + angle_loss) + gama*(point_loss + energy_loss)
-        
-        if cfg.mid:
-            loss = loss + gama*midline_loss
-        if cfg.embed: # or cfg.mid:
-            loss = loss + embed_ratio*embed_loss
 
         loss_dict = {
             'total_loss': loss,
@@ -224,12 +187,6 @@ class TextLoss(nn.Module):
             'point_loss': gama*point_loss,
             'energy_loss': gama*energy_loss,
         }
-
-        if cfg.embed: # or cfg.mid:
-            loss_dict['embed_loss'] = embed_ratio*embed_loss
-            # loss_dict['ssim_loss'] = ssim_loss
-        if cfg.mid:
-            loss_dict['midline_loss'] = gama*midline_loss
 
         return loss_dict
 

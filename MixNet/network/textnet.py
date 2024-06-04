@@ -9,8 +9,6 @@ from network.layers.model_block import FPN
 from network.layers.Transformer import Transformer
 from network.layers.gcn_utils import get_node_feature
 from util.misc import get_sample_point
-# import cc_torch
-from .midline import midlinePredictor
 
 class Evolution(nn.Module):
     def __init__(self, node_num, seg_channel, is_training=True, device=None):
@@ -36,7 +34,6 @@ class Evolution(nn.Module):
 
     @staticmethod
     def get_boundary_proposal(input=None, seg_preds=None, switch="gt"):
-
         if switch == "gt":
             inds = torch.where(input['ignore_tags'] > 0)
             init_polys = input['proposal_points'][inds]
@@ -71,8 +68,6 @@ class Evolution(nn.Module):
             for idx in range(1, ret):
                 text_mask = labels == idx
                 confidence = round(cls_preds[bid][text_mask].mean(), 3)
-                # 50 for MLT2017 and ArT (or DCN is used in backone); else is all 150;
-                # just can set to 50, which has little effect on the performance
                 if np.sum(text_mask) < 50/(cfg.scale*cfg.scale) or confidence < cfg.cls_threshold:
                     continue
                 confidences.append(confidence)
@@ -106,17 +101,15 @@ class Evolution(nn.Module):
             i_poly[:, :, 1] = torch.clamp(i_poly[:, :, 1], 0, h - 1)
         return i_poly
     
-    def forward(self, embed_feature, input=None, seg_preds=None, switch="gt", embed = None):
+    def forward(self, embed_feature, input=None, seg_preds=None, switch="gt"):
         if self.is_training:
             init_polys, inds, confidences = self.get_boundary_proposal(input=input, seg_preds=seg_preds, switch=switch)
-            # TODO sample fix number
         else:
             init_polys, inds, confidences = self.get_boundary_proposal_eval(input=input, seg_preds=seg_preds)
-            # init_polys, inds, confidences = self.get_boundary_proposal_eval_cuda(input=input, seg_preds=seg_preds - embed)
             if init_polys.shape[0] == 0:
                 return [init_polys for i in range(self.iter+1)], inds, confidences
 
-        py_preds = [init_polys, ]
+        py_preds = [init_polys]
         for i in range(self.iter):
             evolve_gcn = self.__getattr__('evolve_gcn' + str(i))
             init_polys = self.evolve_poly(evolve_gcn, embed_feature, init_polys, inds[0])
@@ -140,22 +133,7 @@ class TextNet(nn.Module):
             nn.Conv2d(16, 4, kernel_size=1, stride=1, padding=0),
         )
 
-        if cfg.embed:
-            self.embed_head = nn.Sequential(
-                nn.Conv2d(32, 16, kernel_size=3, padding=2, dilation=2),
-                nn.PReLU(),
-                nn.Conv2d(16, 16, kernel_size=3, padding=4, dilation=4),
-                nn.PReLU(),
-                nn.Conv2d(16, 4, kernel_size=1, stride=1, padding=0),
-            )
-            self.embed_head = nn.Conv2d(32, 1, kernel_size=1, stride=1, padding=0),
-        if not cfg.onlybackbone:
-            if cfg.mid:
-                self.BPN = midlinePredictor(seg_channel=32+4)
-            # elif cfg.pos:
-                # self.BPN = Evolution(cfg.num_points, seg_channel=32+4+2, is_training=is_training, device=cfg.device)
-            else:
-                self.BPN = Evolution(cfg.num_points, seg_channel=32+4, is_training=is_training, device=cfg.device)
+        self.BPN = Evolution(cfg.num_points, seg_channel=32+4, is_training=is_training, device=cfg.device)
 
     def load_model(self, model_path):
         print('Loading from {}'.format(model_path))
@@ -181,26 +159,13 @@ class TextNet(nn.Module):
 
         fy_preds = torch.cat([torch.sigmoid(preds[:, 0:2, :, :]), preds[:, 2:4, :, :]], dim=1)
 
-        if cfg.onlybackbone:
-            output["fy_preds"] = fy_preds
-            return output
-
         cnn_feats = torch.cat([up1, fy_preds], dim=1)
-        if cfg.embed: 
-            embed_feature = self.embed_head(up1)
 
-        if cfg.mid:
-            py_preds, inds, confidences, midline = self.BPN(cnn_feats, input=input_dict, seg_preds=fy_preds, switch="gt")
-        else:
-            py_preds, inds, confidences = self.BPN(cnn_feats, input=input_dict, seg_preds=fy_preds, switch="gt")
+        py_preds, inds, confidences = self.BPN(cnn_feats, input=input_dict, seg_preds=fy_preds, switch="gt")
         
         output["fy_preds"] = fy_preds
         output["py_preds"] = py_preds
         output["inds"] = inds
         output["confidences"] = confidences
-        if cfg.mid:
-            output["midline"] = midline
-        if cfg.embed:
-            output["embed"] = embed_feature
 
         return output
