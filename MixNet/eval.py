@@ -40,7 +40,7 @@ def write_to_file(contours, file_path):
 def inference(model, test_loader, output_dir):
     total_time = 0.
     osmkdir(output_dir)
-    device = torch.device("cuda")
+    device = cfg.device
     iou_scores = []
     hit_rates = []
 
@@ -131,13 +131,14 @@ def main(vis_dir_path):
         load_memory=cfg.load_memory,
         transform=BaseTransform(size=cfg.test_size, mean=cfg.means, std=cfg.stds)
     )
+    torch.cuda.set_device(cfg.device)
     cudnn.benchmark = False
     test_loader = data.DataLoader(testset, batch_size=1, shuffle=False, num_workers=cfg.num_workers)
     model = TextNet(is_training=False, backbone=cfg.net)
     model_path = os.path.join(cfg.save_dir, cfg.exp_name,
                               'MixNet_{}_{}.pth'.format(model.backbone_name, cfg.checkepoch))
     model.load_model(model_path)
-    model.to(torch.device("cuda"))
+    model.to(torch.device(cfg.device))
     model.eval()
     with torch.no_grad():
         print('Start testing MixNet.')
