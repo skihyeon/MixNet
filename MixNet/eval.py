@@ -7,12 +7,14 @@ import torch
 import torch.backends.cudnn as cudnn
 import torch.utils.data as data
 from dataset.concat_datasets import AllDataset
+from dataset.open_data import TotalText
 from network.textnet import TextNet
 from cfglib.config import config as cfg, update_config
 
 from cfglib.option import BaseOptions
 from util.visualize import visualize_detection, visualize_gt
 from util.misc import mkdirs,rescale_result
+from util.augmentation import BaseTransform
 from cal_IoU import evaluate_iou
 
 import multiprocessing
@@ -122,7 +124,13 @@ def main(vis_dir_path):
     #     load_memory=cfg.load_memory,
     #     transform=BaseTransform(size=cfg.test_size, mean=cfg.means, std=cfg.stds)
     # )
-    testset = AllDataset(config=cfg, custom_data_root="./data/kor", open_data_root="./data/open_datas", is_training=False)
+    # testset = AllDataset(config=cfg, custom_data_root="./data/kor", open_data_root="./data/open_datas", is_training=False)
+    testset = TotalText(
+        data_root = './data/open_datas/totaltext',
+        is_training=False,
+        load_memory=cfg.load_memory,
+        transform=BaseTransform(size=cfg.test_size, mean=cfg.means, std=cfg.stds)
+    )
     cudnn.benchmark = False
     test_loader = data.DataLoader(testset, batch_size=1, shuffle=False, num_workers=cfg.num_workers)
     model = TextNet(is_training=False, backbone=cfg.net)
