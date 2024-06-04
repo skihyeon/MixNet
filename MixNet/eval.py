@@ -102,7 +102,7 @@ def inference(model, test_loader, output_dir):
 
         # avg_iou = np.mean(iou_score)
 
-        hit_rate = len(contours)/len(gt_contour)
+        hit_rate = len(contours)/len(gt_contour) if gt_contour else 0
         hit_rates.append(hit_rate)
         # print('detect {} / {} images: {}. ({:.2f} fps) / 평균 IoU: {:.2f}'.format(i + 1, len(test_loader), meta['image_id'][idx], fps, avg_iou), end='\r', flush=True)
         # print('Index {} / {},  images: {}. / IoU: {:.2f} / Hit!: {:.2f}%'.format(i + 1, len(test_loader), meta['image_id'][idx], avg_iou, hit_rate*100))

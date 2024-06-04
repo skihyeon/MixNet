@@ -185,7 +185,7 @@ def FSNet_Splus(pretrained = True):
         print("FSNet_M does not have pretrained weight yet. ")
     return model
 
-def FSNet_M(pretrained = True):
+def FSNet_M():
     numofblocks = [
         [4,2,2,2],
         [4,4,4],
@@ -196,12 +196,6 @@ def FSNet_M(pretrained = True):
     model = FeatureShuffleNet(bottleneck, channels = 64, numofblocks = numofblocks)
     print("FSNet_M now with bottleneck.")
     print("FSNet_M parameter size: ", count_parameters(model))
-    if pretrained:
-        # load_path = "./pretrained/FSNet_M_ALL.pth"
-        # cpt = torch.load(load_path)
-        # model.load_state_dict(cpt, strict=True)
-        # print("load pretrain weight from {}. ".format(load_path))
-        print("FSNet_M does not have pretrained weight yet. ")
     return model
 
 def FSNeXt_M(pretrained = True):
