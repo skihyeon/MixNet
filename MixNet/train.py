@@ -110,7 +110,7 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch, writer):
 def main():
     global lr
     torch.cuda.set_device(cfg.device)
-    trainset = AllDataset(config=cfg, custom_data_root="./data/kor", open_data_root="./data/open_datas", is_training=True)
+    trainset = AllDataset(config=cfg, custom_data_root="./data/kor", open_data_root="./data/open_datas", is_training=True, load_memory=cfg.load_memory)
 
 
 

@@ -9,33 +9,37 @@ from my_dataset import myDataset
 from util.augmentation import Augmentation
 # from cfglib import config as cfg
 
-def concat_open_datas(config, data_root: str = "data/open_datas", is_training: bool = True):
+def concat_open_datas(config, data_root: str = "data/open_datas", is_training: bool = True, load_memory: bool = False):
     tr1 = TotalText(
         data_root = os.path.join(data_root, "totaltext"),
         is_training=is_training,
-        transform=Augmentation(size=config.input_size, mean=config.means, std=config.stds)
+        transform=Augmentation(size=config.input_size, mean=config.means, std=config.stds),
+        load_memory = load_memory
     )
 
     tr2 = MSRA_TD500(
         data_root = os.path.join(data_root, "MSRA-TD500"),
         is_training=is_training,
-        transform=Augmentation(size=config.input_size, mean=config.means, std=config.stds)
+        transform=Augmentation(size=config.input_size, mean=config.means, std=config.stds),
+        load_memory = load_memory
     )
     tr3 = CTW_1500(
         data_root = os.path.join(data_root, "ctw1500"),
         is_training=is_training,
-        transform=Augmentation(size=config.input_size, mean=config.means, std=config.stds)
+        transform=Augmentation(size=config.input_size, mean=config.means, std=config.stds),
+        load_memory = load_memory
     )
 
     return ConcatDataset([tr1, tr2, tr3])
 
 
-def AllDataset(config, custom_data_root: str="data/kor", open_data_root: str="data/open_datas", is_training: bool = True):
+def AllDataset(config, custom_data_root: str="data/kor", open_data_root: str="data/open_datas", is_training: bool = True,  load_memory: bool = False):
     opened_datasets = concat_open_datas(config, data_root=open_data_root, is_training=is_training)
     myData = myDataset(
         data_root=custom_data_root,
         is_training=is_training,
-        transform=Augmentation(size=config.input_size, mean=config.means, std=config.stds)
+        transform=Augmentation(size=config.input_size, mean=config.means, std=config.stds),
+        load_memory = load_memory
     )
 
     return ConcatDataset([opened_datasets, myData])
