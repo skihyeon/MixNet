@@ -117,6 +117,9 @@ class Evolution(nn.Module):
 
         return py_preds, inds, confidences
     
+def count_parameters(model):
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
 
 class TextNet(nn.Module):
     def __init__(self, backbone='vgg', is_training=True):
@@ -124,6 +127,7 @@ class TextNet(nn.Module):
         self.is_training = is_training
         self.backbone_name = backbone
         self.fpn = FPN(self.backbone_name, is_training=(not cfg.resume and is_training))
+        print(f"MixNet with {self.backbone_name} parameter size: ", count_parameters(self.fpn))
 
         self.seg_head = nn.Sequential(
             nn.Conv2d(32, 16, kernel_size=3, padding=2, dilation=2),

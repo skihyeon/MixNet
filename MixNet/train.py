@@ -8,6 +8,7 @@ import torch.utils.data as data
 from torch.optim import lr_scheduler
 
 from dataset.concat_datasets import AllDataset
+from dataset.open_data import TotalText
 from network.loss import TextLoss, knowledge_loss
 from network.textnet import TextNet
 from cfglib.config import config as cfg, update_config, print_config
@@ -18,7 +19,7 @@ from cfglib.option import BaseOptions
 
 from tqdm.auto import tqdm
 from torch.utils.tensorboard import SummaryWriter
-
+from util.augmentation import Augmentation
 
 def save_model(model, epoch, lr):
     save_dir = os.path.join(cfg.save_dir, cfg.exp_name)
@@ -78,7 +79,8 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch, writer):
 
     print(f'Epoch: {epoch} : LR = {scheduler.get_lr()}')
 
-    for i, inputs in enumerate(tqdm(train_loader, desc=f"Epoch {epoch}")):
+    pbar = tqdm(train_loader, desc=f"Epoch {epoch}")
+    for i, inputs in enumerate(pbar):
         data_time.update(time.time() - end)
         train_step = 1
         input_dict = _parse_data(inputs)
@@ -100,7 +102,7 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch, writer):
         if cfg.viz and (i % cfg.viz_freq == 0 and i > 0):
             visualize_network_output(output_dict, input_dict, mode='train')
 
-        tqdm.write(f'Training Loss: {losses.avg}')
+        pbar.set_postfix({'Training Loss': losses.avg})
         writer.add_scalar('Loss/train', losses.avg, epoch * len(train_loader) + i)
 
     if epoch % cfg.save_freq == 0:
@@ -110,8 +112,13 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch, writer):
 def main():
     global lr
     torch.cuda.set_device(cfg.device)
-    trainset = AllDataset(config=cfg, custom_data_root="./data/kor", open_data_root="./data/open_datas", is_training=True, load_memory=cfg.load_memory)
-
+    # trainset = AllDataset(config=cfg, custom_data_root="./data/kor", open_data_root="./data/open_datas", is_training=True, load_memory=cfg.load_memory)
+    trainset = TotalText(
+        data_root = "./data/open_datas/totaltext",
+        is_training=True,
+        transform=Augmentation(size=cfg.input_size, mean=cfg.means, std=cfg.stds),
+        load_memory = cfg.load_memory
+    )
 
 
     if cfg.server_code == 24:       ## 24 서버 Torch 버전 문제로 인해 Generator 호환 X
