@@ -57,11 +57,6 @@ def _parse_data(inputs):
     input_dict['gt_points'] = inputs[6]
     input_dict['proposal_points'] = inputs[7]
     input_dict['ignore_tags'] = inputs[8]
-    if cfg.embed:
-        input_dict['edge_field'] = inputs[9]
-    if cfg.mid:
-        input_dict['gt_mid_points'] = inputs[9]
-        input_dict['edge_field'] = inputs[10]
 
     return input_dict
 

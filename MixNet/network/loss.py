@@ -129,9 +129,8 @@ class TextLoss(nn.Module):
 
         fy_preds = output_dict["fy_preds"]
 
-        if not cfg.onlybackbone:
-            py_preds = output_dict["py_preds"]
-            inds = output_dict["inds"]
+        py_preds = output_dict["py_preds"]
+        inds = output_dict["inds"]
 
         train_mask = input_dict['train_mask'].float()
         tr_mask = input_dict['tr_mask'] > 0
