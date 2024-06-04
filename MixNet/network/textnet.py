@@ -122,12 +122,16 @@ def count_parameters(model):
 
 
 class TextNet(nn.Module):
-    def __init__(self, backbone='vgg', is_training=True):
+    def __init__(self, backbone='vgg', is_training=True, freeze_backbone=False):
         super().__init__()
         self.is_training = is_training
         self.backbone_name = backbone
         self.fpn = FPN(self.backbone_name, is_training=(not cfg.resume and is_training))
         print(f"MixNet with {self.backbone_name} parameter size: ", count_parameters(self.fpn))
+        
+        if freeze_backbone:
+            for param in self.fpn.parameters():
+                param.requires_grad = False
 
         self.seg_head = nn.Sequential(
             nn.Conv2d(32, 16, kernel_size=3, padding=2, dilation=2),

@@ -86,6 +86,8 @@ class BaseOptions(object):
 
         self.parser.add_argument('--infer_path', default=None, type=str, help='inferene image or folder path')
         self.parser.add_argument('--server_code', default=141, type=int, help='Server code')
+        self.parser.add_argument('--freeze_backbone', default=False, type=str2bool, help='Freeze backbone for transfer learning')
+        self.parser.add_argument('--tune_option', default=None, choices=[None, 'finetune_with_totaltext', 'transferlearning_with_customdata'], type=str, help='Tune option for transfer learning')
     def parse(self, fixed=None):
 
         if fixed is not None:
