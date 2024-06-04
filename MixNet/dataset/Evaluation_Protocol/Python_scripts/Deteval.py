@@ -28,9 +28,9 @@ args = parser.parse_args()
 Input format: y0,x0, ..... yn,xn. Each detection is separated by the end of line token ('\n')'
 """
 
-input_dir = 'output/{}'.format(args.exp_name)
-eval_result_dir = "output/Analysis/output_eval"
-gt_dir = 'data/totaltext/Groundtruth/Polygon/Test'
+input_dir = './output/{}'.format(args.exp_name)
+eval_result_dir = "./output/Analysis/output_eval"
+gt_dir = './data/open_datas/totaltext/Groundtruth/Polygon/Test'
 fid_path = '{}/Eval_TotalText_{}_{}.txt'.format(eval_result_dir, args.tr, args.tp)
 
 
