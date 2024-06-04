@@ -72,7 +72,6 @@ def horizonBlock(plane):
     )
 
 class FPN(nn.Module):
-
     def __init__(self, backbone='FSNet_M', is_training=True):
         super().__init__()
         self.is_training = is_training
@@ -81,7 +80,7 @@ class FPN(nn.Module):
         self.hor_block = False
 
         if backbone in ["FSNet_hor"]:
-            self.backbone = FSNet_M(pretrained=is_training)
+            self.backbone = FSNet_M()
             out_channels = self.backbone.channels * 4
             self.hor_block = True
             self.hors = nn.ModuleList()

@@ -115,14 +115,8 @@ class FSNet(nn.Module):
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
-def FSNet_M(pretrained = True):
+def FSNet_M():
     model = FSNet()
     print("MixNet backbone parameter size: ", count_parameters(model))
-    if pretrained:
-        load_path = "./pretrained/triHRnet_Synth_weight.pth"
-        cpt = torch.load(load_path)
-        model.load_state_dict(cpt, strict=True)
-        print("load pretrain weight from {}. ".format(load_path))
-        # print("mixHRnet does not have pretrained weight yet. ")
     return model
 
