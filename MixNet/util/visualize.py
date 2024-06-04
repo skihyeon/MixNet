@@ -25,9 +25,6 @@ def visualize_network_output(output_dict, input_dict, mode='train'):
     init_polys = output_dict["py_preds"][0]
     inds = output_dict["inds"]
 
-    if cfg.mid == True:
-        midline = output_dict["midline"]
-
     image = input_dict['img']
     tr_mask = input_dict['tr_mask'].data.cpu().numpy() > 0
     distance_field = input_dict['distance_field'].data.cpu().numpy()
@@ -99,8 +96,6 @@ def visualize_network_output(output_dict, input_dict, mode='train'):
             cv2.drawContours(image_show, init_py.astype(np.int32), -1, (0, 125, 125), 2)
             cv2.drawContours(image_show, gt_py.astype(np.int32), -1, (255, 125, 0), 2)
             cv2.drawContours(image_show, contours.astype(np.int32), -1, (0, 255, 125), 2)
-            if cfg.mid == True:
-                cv2.polylines(image_show, midline.astype(np.int32), False, (125, 255, 0), 2)
             shows.append(image_show)
 
         for idx, im_show in enumerate(shows):
