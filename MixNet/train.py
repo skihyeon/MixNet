@@ -9,7 +9,7 @@ from torch.optim import lr_scheduler
 
 from dataset.concat_datasets import AllDataset
 from dataset.open_data import TotalText
-from dataset.my_dataset import MyDataset
+from dataset.my_dataset import myDataset
 from network.loss import TextLoss, knowledge_loss
 from network.textnet import TextNet
 from cfglib.config import config as cfg, update_config, print_config
@@ -117,7 +117,7 @@ def main():
     #     load_memory = cfg.load_memory
     # )
 
-    trainset = MyDataset(
+    trainset = myDataset(
         data_root = "./data/kor",
         is_training=True,
         transform=Augmentation(size=cfg.input_size, mean=cfg.means, std=cfg.stds),
