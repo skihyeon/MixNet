@@ -7,6 +7,7 @@ import torch
 import torch.backends.cudnn as cudnn
 import torch.utils.data as data
 from dataset.concat_datasets import AllDataset
+from dataset.my_dataset import myDataset
 from dataset.open_data import TotalText
 from network.textnet import TextNet
 from cfglib.config import config as cfg, update_config
@@ -125,12 +126,20 @@ def main(vis_dir_path):
     #     transform=BaseTransform(size=cfg.test_size, mean=cfg.means, std=cfg.stds)
     # )
     # testset = AllDataset(config=cfg, custom_data_root="./data/kor", open_data_root="./data/open_datas", is_training=False)
-    testset = TotalText(
-        data_root = './data/open_datas/totaltext',
-        is_training=False,
-        load_memory=cfg.load_memory,
-        transform=BaseTransform(size=cfg.test_size, mean=cfg.means, std=cfg.stds)
-    )
+    if cfg.eval_dataset == 'totaltext': 
+        testset = TotalText(
+            data_root = './data/open_datas/totaltext',
+            is_training=False,
+            load_memory=cfg.load_memory,
+            transform=BaseTransform(size=cfg.test_size, mean=cfg.means, std=cfg.stds)
+        )
+    elif cfg.eval_dataset == 'my':
+        testset = myDataset(
+            data_root = './data/kor',
+            is_training=False,
+            load_memory=cfg.load_memory,
+            transform=BaseTransform(size=cfg.test_size, mean=cfg.means, std=cfg.stds)
+        )
     torch.cuda.set_device(cfg.device)
     cudnn.benchmark = False
     test_loader = data.DataLoader(testset, batch_size=1, shuffle=False, num_workers=cfg.num_workers)

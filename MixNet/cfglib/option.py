@@ -89,6 +89,7 @@ class BaseOptions(object):
         self.parser.add_argument('--freeze_backbone', default=False, type=str2bool, help='Freeze backbone for transfer learning')
         self.parser.add_argument('--tune_option', default=None, choices=[None, 'finetune_with_totaltext', 'transferlearning_with_customdata'], type=str, help='Tune option for transfer learning')
         self.parser.add_argument('--gpu_num', default='2', type=str, help='GPU number')
+        self.parser.add_argument('--eval_dataset', default=None, choices=['totaltext', 'my'],type=str, help='Eval dataset')
     def parse(self, fixed=None):
 
         if fixed is not None:
