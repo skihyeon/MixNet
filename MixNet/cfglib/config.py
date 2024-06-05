@@ -35,7 +35,7 @@ config.input_size = 640
 
 # max polygon per image
 # synText, total-text:64; CTW1500: 64; icdar: 64;  MLT: 32; TD500: 64.
-config.max_annotation = 2000
+config.max_annotation = 700
 
 # adj num for graph
 config.adj_num = 4

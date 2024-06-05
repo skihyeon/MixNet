@@ -129,20 +129,20 @@ if __name__ == '__main__':
         img = img.transpose(1, 2, 0)
         img = ((img * stds + means) * 255).astype(np.uint8)
 
-        distance_map = cav.heatmap(np.array(distance_field * 255 / np.max(distance_field), dtype=np.uint8))
-        cv2.imshow("distance_map", (distance_map > 0.7).astype(np.uint8))
-        cv2.waitKey(0)
+        # distance_map = cav.heatmap(np.array(distance_field * 255 / np.max(distance_field), dtype=np.uint8))
+        # cv2.imshow("distance_map", (distance_map > 0.7).astype(np.uint8))
+        # cv2.waitKey(0)
 
-        direction_map = cav.heatmap(np.array(direction_field[0] * 255 / np.max(direction_field[0]), dtype=np.uint8))
-        cv2.imshow("direction_field", direction_map)
-        cv2.waitKey(0)
-        #
-        from util.vis_flux import vis_direction_field
-        vis_direction_field(direction_field)
+        # direction_map = cav.heatmap(np.array(direction_field[0] * 255 / np.max(direction_field[0]), dtype=np.uint8))
+        # cv2.imshow("direction_field", direction_map)
+        # cv2.waitKey(0)
+        # #
+        # from util.vis_flux import vis_direction_field
+        # vis_direction_field(direction_field)
 
-        weight_map = cav.heatmap(np.array(weight_matrix * 255 / np.max(weight_matrix), dtype=np.uint8))
-        cv2.imshow("weight_matrix", weight_map)
-        cv2.waitKey(0)
+        # weight_map = cav.heatmap(np.array(weight_matrix * 255 / np.max(weight_matrix), dtype=np.uint8))
+        # cv2.imshow("weight_matrix", weight_map)
+        # cv2.waitKey(0)
 
 
         boundary_point = ctrl_points[np.where(ignore_tags!=0)[0]]

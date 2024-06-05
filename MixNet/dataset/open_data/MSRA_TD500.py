@@ -6,6 +6,8 @@ import mmengine
 import math
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+
 from dataload import TextDataset, TextInstance, pil_load_img
 
 class MSRA_TD500(TextDataset):
@@ -98,37 +100,59 @@ if __name__ == '__main__':
     )
 
     trainset = MSRA_TD500(
-        data_root='../../data/open_datas',
+        data_root='../../data/open_datas/MSRA-TD500',
         is_training=True,
         transform=transform
     )
 
     for idx in range(0, len(trainset)):
-        idx  = 15
         t0 = time.time()
-        image_info = trainset[idx]
-        print(trainset.image_list[idx])
-        img, train_mask, tr_mask = image_info[0], image_info[1], image_info[2]
-        img, train_mask, tr_mask = map(lambda x: x.cpu().numpy(), (img, train_mask, tr_mask))
+        img, train_mask, tr_mask, distance_field, \
+        direction_field, weight_matrix, ctrl_points, proposal_points, ignore_tags, _ = trainset[idx]
+        img, train_mask, tr_mask, distance_field, \
+        direction_field, weight_matrix, ctrl_points, proposal_points, ignore_tags\
+            = map(lambda x: x.cpu().numpy(),
+                  (img, train_mask, tr_mask, distance_field,
+                   direction_field, weight_matrix, ctrl_points, proposal_points, ignore_tags))
+
         img = img.transpose(1, 2, 0)
         img = ((img * stds + means) * 255).astype(np.uint8)
-        print(idx, img.shape)
-        # tr_mask = (tr_mask > 0)
-        ignore_tag = image_info[8]
-        gt = image_info[6][ignore_tag == 1].numpy().astype(np.int64)
-        poly = image_info[7][ignore_tag == 1].numpy().astype(np.int64)
-        print(gt.shape)
-        print(poly.shape)
 
-        for i in range(len(poly)):
-            for j in range(20):
-                cv2.circle(img, tuple(gt[i,j]), 3, (255,0,0), -1)
-                cv2.circle(img, tuple(poly[i,j]), 3, (0,255,0), -1)
-        cv2.imwrite("tr_mask.jpg", np.array((tr_mask > 0) * 255, dtype=np.uint8))
-        cv2.imwrite('imgsshow.jpg', img)
+        # distance_map = cav.heatmap(np.array(distance_field * 255 / np.max(distance_field), dtype=np.uint8))
+        # cv2.imshow("distance_map", (distance_map > 0.7).astype(np.uint8))
+        # cv2.waitKey(0)
 
-        distance_field = image_info[3].numpy()
-        distance_map = cav.heatmap(np.array((distance_field) * 255 / np.max(distance_field), dtype=np.uint8))
-        cv2.imwrite("distance_map.jpg", distance_map*255)
+        # direction_map = cav.heatmap(np.array(direction_field[0] * 255 / np.max(direction_field[0]), dtype=np.uint8))
+        # cv2.imshow("direction_field", direction_map)
+        # cv2.waitKey(0)
+        # #
+        # from util.vis_flux import vis_direction_field
+        # vis_direction_field(direction_field)
 
-        break
+        # weight_map = cav.heatmap(np.array(weight_matrix * 255 / np.max(weight_matrix), dtype=np.uint8))
+        # cv2.imshow("weight_matrix", weight_map)
+        # cv2.waitKey(0)
+
+
+        boundary_point = ctrl_points[np.where(ignore_tags!=0)[0]]
+        for i, bpts in enumerate(boundary_point):
+            cv2.drawContours(img, [bpts.astype(np.int32)], -1, (0, 255, 0), 1)
+            for j,  pp in enumerate(bpts):
+                if j==0:
+                    cv2.circle(img, (int(pp[0]), int(pp[1])), 2, (255, 0, 255), -1)
+                elif j==1:
+                    cv2.circle(img, (int(pp[0]), int(pp[1])), 2, (0, 255, 255), -1)
+                else:
+                    cv2.circle(img, (int(pp[0]), int(pp[1])), 2, (0, 0, 255), -1)
+
+            ppts = proposal_points[i]
+            cv2.drawContours(img, [ppts.astype(np.int32)], -1, (0, 0, 255), 1)
+            for j,  pp in enumerate(ppts):
+                if j==0:
+                    cv2.circle(img, (int(pp[0]), int(pp[1])), 2, (255, 0, 255), -1)
+                elif j==1:
+                    cv2.circle(img, (int(pp[0]), int(pp[1])), 2, (0, 255, 255), -1)
+                else:
+                    cv2.circle(img, (int(pp[0]), int(pp[1])), 2, (0, 0, 255), -1)
+            cv2.imshow('imgs', img)
+            cv2.waitKey(0)
