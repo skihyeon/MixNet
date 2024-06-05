@@ -9,6 +9,7 @@ from torch.optim import lr_scheduler
 
 from dataset.concat_datasets import AllDataset
 from dataset.open_data import TotalText
+from dataset.my_dataset import myDataset
 from network.loss import TextLoss, knowledge_loss
 from network.textnet import TextNet
 from cfglib.config import config as cfg, update_config, print_config
@@ -108,8 +109,16 @@ def main():
     global lr
     torch.cuda.set_device(cfg.device)
     # trainset = AllDataset(config=cfg, custom_data_root="./data/kor", open_data_root="./data/open_datas", is_training=True, load_memory=cfg.load_memory)
-    trainset = TotalText(
-        data_root = "./data/open_datas/totaltext",
+    
+    # trainset = TotalText(
+    #     data_root = "./data/open_datas/totaltext",
+    #     is_training=True,
+    #     transform=Augmentation(size=cfg.input_size, mean=cfg.means, std=cfg.stds),
+    #     load_memory = cfg.load_memory
+    # )
+
+    trainset = myDataset(
+        data_root = "./data/kor",
         is_training=True,
         transform=Augmentation(size=cfg.input_size, mean=cfg.means, std=cfg.stds),
         load_memory = cfg.load_memory
@@ -125,7 +134,7 @@ def main():
                                        shuffle=True, num_workers=cfg.num_workers,
                                        pin_memory=True, generator=torch.Generator(device=cfg.device))
     
-    model = TextNet(backbone=cfg.net, is_training=True)
+    model = TextNet(backbone=cfg.net, is_training=True, freeze_backbone=cfg.freeze_backbone)
     model = model.to(cfg.device)
     criterion = TextLoss()
 
@@ -138,6 +147,8 @@ def main():
         cudnn.benchmark = True
     if cfg.resume:
         load_model(model, cfg.resume)
+    if cfg.freeze_backbone and not cfg.resume:
+        assert "Freeze backbone is only available when resume is True"
 
     lr = cfg.lr
 

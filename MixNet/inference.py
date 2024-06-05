@@ -61,8 +61,8 @@ class myDataset(TextDataset):
         return 1
 
 def inference(model, image_path, output_dir):
-    device = torch.device("cuda")
 
+    torch.cuda.set_device(cfg.device)
     dataset = myDataset(image_path=image_path,transform=BaseTransform(size=cfg.test_size, mean=cfg.means, std=cfg.stds))
     data = dataset[0]
     image, meta = data
@@ -70,7 +70,7 @@ def inference(model, image_path, output_dir):
     input_dict = dict()
     H, W = meta['Height'], meta['Width']
 
-    input_dict['img'] = torch.tensor(image[np.newaxis, :]).to(device)
+    input_dict['img'] = torch.tensor(image[np.newaxis, :]).to(cfg.device)
     with torch.no_grad():
         output_dict = model(input_dict)
     
@@ -113,7 +113,7 @@ def main(image_path):
     model_path = os.path.join(cfg.save_dir, cfg.exp_name,
                               'MixNet_{}_{}.pth'.format(model.backbone_name, cfg.checkepoch))
     model.load_model(model_path)
-    model.to(torch.device("cuda"))
+    model.to(cfg.device)
     model.eval()
     with torch.no_grad():
         print('Start infer MixNet.')

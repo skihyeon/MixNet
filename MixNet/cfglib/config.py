@@ -35,7 +35,7 @@ config.input_size = 640
 
 # max polygon per image
 # synText, total-text:64; CTW1500: 64; icdar: 64;  MLT: 32; TD500: 64.
-config.max_annotation = 2000
+config.max_annotation = 700
 
 # adj num for graph
 config.adj_num = 4
@@ -74,10 +74,10 @@ def update_config(config, extra_config):
         config[k] = v
 
     if config.cuda and torch.cuda.device_count() > 1:
-        config.device = torch.device('cuda:1')
+        config.device = torch.device('cuda:'+str(config.gpu_num))
         if config.mgpu:
-            config.device = torch.device('cuda:0')
             config.device_ids = [0,1]
+            config.device = torch.device('cuda:'+str(config.device_ids[0]))
     else:
         config.device = torch.device('cuda:0') if config.cuda else torch.device('cpu')
 
