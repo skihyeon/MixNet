@@ -135,7 +135,7 @@ def main(vis_dir_path):
         )
     elif cfg.eval_dataset == 'my':
         testset = myDataset(
-            data_root = './data/kor',
+            data_root = './data/kor_extended',
             is_training=False,
             load_memory=cfg.load_memory,
             transform=BaseTransform(size=cfg.test_size, mean=cfg.means, std=cfg.stds)

@@ -118,7 +118,7 @@ def main():
     # )
 
     trainset = myDataset(
-        data_root = "./data/kor",
+        data_root = "./data/kor_extended",
         is_training=True,
         transform=Augmentation(size=cfg.input_size, mean=cfg.means, std=cfg.stds),
         load_memory = cfg.load_memory
