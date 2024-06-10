@@ -67,7 +67,7 @@ class BaseOptions(object):
                                  choices=["FSNet_M", "FSNet_H_M","FSNet_hor"], help='Network architecture')
         self.parser.add_argument('--mid', default=False, type=str2bool, help='midline predict to Transformer')
         # self.parser.add_argument('--embed', default=False, type=str2bool, help='predict embeding value for training')
-        # self.parser.add_argument('--know', default=False, type=str2bool, help='Knowledge Distillation')
+        self.parser.add_argument('--know', default=False, type=str2bool, help='Knowledge Distillation')
         # self.parser.add_argument('--onlybackbone', default=False, type=str2bool, help='skip the Transformer block, only train the FSNet. ')
         # data args
         self.parser.add_argument('--load_memory', default=False, type=str2bool, help='Load data into memory')

@@ -39,6 +39,7 @@ def write_to_file(contours, file_path):
             f.write(cont + '\n')
 
 def inference(model, test_loader, output_dir):
+    model.eval()
     total_time = 0.
     osmkdir(output_dir)
     device = cfg.device

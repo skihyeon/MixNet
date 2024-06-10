@@ -143,7 +143,7 @@ class TextNet(nn.Module):
         )
 
         if cfg.mid:
-            self.BPN = midlinePredictor(seg_channel=32+4)
+            self.BPN = midlinePredictor(seg_channel=32+4, is_training=is_training)
         else:
             self.BPN = Evolution(cfg.num_points, seg_channel=32+4, is_training=is_training, device=cfg.device)
 

@@ -11,13 +11,14 @@ from util.misc import get_sample_point
 
 
 class midlinePredictor(nn.Module):
-    def __init__(self, seg_channel):
+    def __init__(self, seg_channel, is_training=True):
         super(midlinePredictor, self).__init__()
         self.seg_channel = seg_channel
         self.clip_dis = 100
         self.midline_preds = nn.ModuleList()
         self.contour_preds = nn.ModuleList()
         self.iter = 3 # 3
+        self.is_training = is_training
         for i in range(self.iter):
             self.midline_preds.append(
                 Transformer(
@@ -31,7 +32,7 @@ class midlinePredictor(nn.Module):
                     dim_feedforward=1024, drop_rate=0.0, 
                     if_resi=True, block_nums=3, pred_num=2, batch_first=False)
             )
-        if not self.training:
+        if not self.is_training:
             self.iter = 1
 
         for m in self.modules():
@@ -77,7 +78,7 @@ class midlinePredictor(nn.Module):
         return init_polys, inds, confidences
 
     def forward(self, embed_feature, input=None, seg_preds=None, switch="gt"):
-        if self.training:
+        if self.is_training:
             init_polys, inds, confidences = self.get_boundary_proposal(input=input) # get sample point from gt
         else:
             init_polys, inds, confidences = self.get_boundary_proposal_eval(input=input, seg_preds=seg_preds)

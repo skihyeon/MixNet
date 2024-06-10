@@ -56,17 +56,17 @@ config.scale = 1
 config.grad_clip = 25
 
 # demo tcl threshold
-config.dis_threshold = 0.3
-
-config.cls_threshold = 0.8
+# config.dis_threshold = 0.3
+#
+# config.cls_threshold = 0.8
 
 # Contour approximation factor
 config.approx_factor = 0.004
 
 # knowledge
 config.know = False
-# config.knownet = "mixTriHRnet_cbam"
-# config.know_resume = "./model/Totaltext_mid/TextBPN_mixTriHRnet_cbam_622.pth"
+# config.knownet = "craft"
+config.know_resume = "./model/Test/craft.pth"
 
 
 def update_config(config, extra_config):
