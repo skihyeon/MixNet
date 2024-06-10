@@ -7,9 +7,10 @@ import torch.backends.cudnn as cudnn
 import torch.utils.data as data
 from torch.optim import lr_scheduler
 
-from dataset.concat_datasets import AllDataset
+
 from dataset.open_data import TotalText
 from dataset.my_dataset import myDataset
+from dataset.my_dataset_mid import myDataset_mid
 from network.loss import TextLoss, knowledge_loss
 from network.textnet import TextNet
 from cfglib.config import config as cfg, update_config, print_config
@@ -58,7 +59,9 @@ def _parse_data(inputs):
     input_dict['gt_points'] = inputs[6]
     input_dict['proposal_points'] = inputs[7]
     input_dict['ignore_tags'] = inputs[8]
-
+    if cfg.mid:
+        input_dict['gt_mid_points'] = inputs[9]
+        input_dict['edge_field'] = inputs[10]
     return input_dict
 
 
@@ -117,13 +120,21 @@ def main():
     #     load_memory = cfg.load_memory
     # )
 
-    trainset = myDataset(
-        data_root = "./data/kor_extended",
+    if not cfg.mid:
+        trainset = myDataset(
+            data_root = "./data/kor_extended",
         is_training=True,
         transform=Augmentation(size=cfg.input_size, mean=cfg.means, std=cfg.stds),
         load_memory = cfg.load_memory
-    )
+        )
 
+    if cfg.mid:
+        trainset = myDataset_mid(
+            data_root = "./data/kor_extended",
+            is_training=True,
+            transform=Augmentation(size=cfg.input_size, mean=cfg.means, std=cfg.stds),
+            load_memory = cfg.load_memory
+        )
 
     if cfg.server_code == 24:       ## 24 서버 Torch 버전 문제로 인해 Generator 호환 X
         train_loader = data.DataLoader(trainset, batch_size=cfg.batch_size,
