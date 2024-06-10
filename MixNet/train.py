@@ -1,12 +1,12 @@
-import gc
 import os
+import time
 import torch
 import numpy as np
 import torch.nn as nn
 import torch.backends.cudnn as cudnn
 import torch.utils.data as data
 from torch.optim import lr_scheduler
-import sys
+
 
 from dataset.open_data import TotalText
 from dataset.my_dataset import myDataset
@@ -22,8 +22,6 @@ from cfglib.option import BaseOptions
 from tqdm.auto import tqdm
 from torch.utils.tensorboard import SummaryWriter
 from util.augmentation import Augmentation
-
-from network import craft
 
 def save_model(model, epoch, lr):
     save_dir = os.path.join(cfg.save_dir, cfg.exp_name)
@@ -73,12 +71,16 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch, writer):
     global train_step
 
     losses = AverageMeter()
+    batch_time = AverageMeter()
+    data_time = AverageMeter()
+    end = time.time()
     model.train()
 
-    print(f'Epoch {epoch}: LR = {scheduler.get_lr()}')
+    print(f'Epoch: {epoch} : LR = {scheduler.get_lr()}')
 
     pbar = tqdm(train_loader, desc=f"Epoch {epoch}")
     for i, inputs in enumerate(pbar):
+        data_time.update(time.time() - end)
         train_step = 1
         input_dict = _parse_data(inputs)
         output_dict = model(input_dict)
@@ -92,6 +94,10 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch, writer):
         optimizer.step()
         losses.update(loss.item())
 
+        batch_time.update(time.time()-end)
+        end = time.time()
+
+        # 학습과정 visualization
         if cfg.viz and (i % cfg.viz_freq == 0 and i > 0):
             visualize_network_output(output_dict, input_dict, mode='train')
 
@@ -102,61 +108,24 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch, writer):
         save_model(model, epoch, scheduler.get_lr())
 
 
-
-def knowledgetrain(model, knowledge, train_loader, criterion, know_criterion, scheduler, optimizer, epoch, writer):
-    global train_step
-
-    losses = AverageMeter()
-    model.train()
-
-    print(f'Epoch {epoch}: LR = {scheduler.get_lr()}')
-
-    pbar = tqdm(train_loader, desc=f"Epoch {epoch}")
-    for i, inputs in enumerate(pbar):
-        train_step += 1
-        input_dict = _parse_data(inputs)
-        output_dict = model(input_dict)
-        output_know = knowledge(input_dict, knowledge=True)
-        loss_dict = criterion(input_dict, output_dict, eps=epoch+1)
-        loss = loss_dict["total_loss"]
-
-        know_loss = know_criterion(output_dict["image_feature"], output_know["image_feature"])
-        loss = loss + know_loss
-        loss_dict["know_loss"] = know_loss
-        optimizer.zero_grad()
-        loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.grad_clip)
-
-        optimizer.step()
-
-        losses.update(loss.item())
-
-        if i % cfg.display_freq == 0:
-            gc.collect()
-            print_inform = "({:d} / {:d}) ".format(i, len(train_loader))
-            for (k, v) in loss_dict.items():
-                print_inform += " {}: {:.4f} ".format(k, v.item())
-            tqdm.write(print_inform)
-        pbar.set_postfix({'Training Loss': losses.avg})
-        writer.add_scalar('Loss/train', losses.avg, epoch * len(train_loader) + i)
-
-    if epoch % cfg.save_freq == 0:
-        save_model(model, epoch, scheduler.get_lr(), optimizer)
-
-
-
-        
-
 def main():
     global lr
     torch.cuda.set_device(cfg.device)
+    # trainset = AllDataset(config=cfg, custom_data_root="./data/kor", open_data_root="./data/open_datas", is_training=True, load_memory=cfg.load_memory)
+    
+    # trainset = TotalText(
+    #     data_root = "./data/open_datas/totaltext",
+    #     is_training=True,
+    #     transform=Augmentation(size=cfg.input_size, mean=cfg.means, std=cfg.stds),
+    #     load_memory = cfg.load_memory
+    # )
 
     if not cfg.mid:
         trainset = myDataset(
             data_root = "./data/kor_extended",
-            is_training=True,
-            transform=Augmentation(size=cfg.input_size, mean=cfg.means, std=cfg.stds),
-            load_memory = cfg.load_memory
+        is_training=True,
+        transform=Augmentation(size=cfg.input_size, mean=cfg.means, std=cfg.stds),
+        load_memory = cfg.load_memory
         )
 
     if cfg.mid:
@@ -182,35 +151,6 @@ def main():
 
     writer = SummaryWriter(log_dir=os.path.join(cfg.save_dir, cfg.exp_name, 'logs'))
 
-
-    
-
-    if cfg.know:
-        ###
-        from collections import OrderedDict
-        def copyStateDict(state_dict):
-            if list(state_dict.keys())[0].startswith("module"):
-                start_idx = 1
-            else:
-                start_idx = 0
-            new_state_dict = OrderedDict()
-            for k, v in state_dict.items():
-                name = ".".join(k.split(".")[start_idx:])
-            new_state_dict[name] = v
-            return new_state_dict
-        ###
-        know_model = craft.CRAFT()
-        # load_model(know_model, cfg.know_resume)
-        # know_model.load_model(cfg.know_resume)
-
-        loaded_model = torch.load(cfg.know_resume)
-        if 'craft' in loaded_model.keys():
-            loaded_model = loaded_model["craft"]
-        know_model.load_state_dict(copyStateDict(loaded_model))
-
-        know_model.eval()
-        know_model.requires_grad = False
-
     if cfg.mgpu:
         model = nn.DataParallel(model, device_ids=[int(i) for i in cfg.device_ids])
 
@@ -230,11 +170,7 @@ def main():
     print('Start training MixNet.')
     for epoch in range(cfg.start_epoch, cfg.max_epoch+1):
         scheduler.step()
-        if cfg.know:
-            know_criterion = knowledge_loss(T=5)
-            knowledgetrain(model, know_model, train_loader, criterion,know_criterion, scheduler, optimizer, epoch, writer)
-        else:
-            train(model, train_loader, criterion, scheduler, optimizer, epoch, writer)
+        train(model, train_loader, criterion, scheduler, optimizer, epoch, writer)
 
     writer.close()
     print('End.')
