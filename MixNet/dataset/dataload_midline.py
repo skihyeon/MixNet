@@ -5,13 +5,11 @@ import numpy as np
 from PIL import Image
 from scipy import ndimage as ndimg
 from cfglib.config import config as cfg
-from util.misc import (
-    find_bottom, 
-    find_long_edges, 
-    split_edge_seqence, 
-    vector_sin, 
-    get_sample_point
-)
+from util.misc import find_bottom, find_long_edges, split_edge_seqence, \
+    vector_sin, get_sample_point
+
+from shapely.geometry import LineString
+from shapely.ops import unary_union
 
 
 def pil_load_img(path):
@@ -74,6 +72,7 @@ class TextInstance(object):
 
 
 class TextDataset(object):
+
     def __init__(self, transform, is_training=False, th_b = 0.35):
         super().__init__()
         self.transform = transform
@@ -82,13 +81,17 @@ class TextDataset(object):
         self.jitter = 0.65
         self.th_b = th_b
 
-
     @staticmethod
     def sigmoid_alpha(x, k):
         betak = (1 + np.exp(-k)) / (1 - np.exp(-k))
         dm = max(np.max(x), 0.0001)
         res = (2 / (1 + np.exp(-x * k / dm)) - 1) * betak
         return np.maximum(0, res)
+
+    @staticmethod
+    def fill_polygon(mask, pts, value):
+        cv2.fillPoly(mask, [pts.astype(np.int32)], color=(value,))
+
 
     @staticmethod
     def generate_proposal_point(text_mask, num_points, approx_factor, jitter=0.0, distance=10.0):
@@ -130,19 +133,51 @@ class TextDataset(object):
 
         return diff
 
+    # def get_more_points(self, midline, target_pts):
+    #     line = LineString(midline)
+    #     distances = np.linspace(0, line.length, target_pts)
+    #     points = [line.interpolate(distance) for distance in distances]
+    #     multipoint = unary_union(points) 
+    #     midline = np.array(multipoint)
+    #     return midline
+
+    def get_more_points(self, midline, target_pts):
+        line = LineString(midline)
+        distances = np.linspace(0, line.length, target_pts)
+        points = [line.interpolate(distance) for distance in distances]
+        midline = np.array([(point.x, point.y) for point in points])  # MultiPoint 객체의 좌표를 추출하여 numpy 배열로 변환
+        return midline
+    
+    def check_poly(self, polys):
+        if polys.shape[0] == 4:
+            if (polys[0][0] - polys[1][0]) + (polys[0][1] - polys[1][1]) < (polys[1][0] - polys[2][0]) + (polys[1][1] - polys[2][1]):
+                polys = polys[::-1]
+        return polys
+
+    def get_gt_midline(self, polys):
+        half = polys.shape[0] // 2
+        topline = polys[:half]
+        botline = polys[half:][::-1]
+
+        midline = (topline + botline) / 2
+        midline = midline.astype(np.int32)
+        midline = self.get_more_points(midline, target_pts = cfg.num_points // 2)
+        return midline
+
     def make_text_region(self, img, polygons):
         h, w = img.shape[0], img.shape[1]
         mask_zeros = np.zeros(img.shape[:2], np.uint8)
 
-        train_mask = np.ones((h, w), dtype=np.float32)
-        tr_mask = np.zeros((h, w), dtype=np.uint8)
+        train_mask = np.ones((h, w), np.float32)
+        tr_mask = np.zeros((h, w), np.uint8)
         weight_matrix = np.zeros((h, w), dtype=np.float32)
         direction_field = np.zeros((2, h, w), dtype=np.float32)
-        distance_field = np.zeros((h, w), dtype=np.float32)
+        distance_field = np.zeros((h, w), np.float32)
         edge_field = np.zeros((h, w), dtype=np.uint8)
 
         gt_points = np.zeros((cfg.max_annotation, cfg.num_points, 2), dtype=np.float32)
         proposal_points = np.zeros((cfg.max_annotation, cfg.num_points, 2), dtype=np.float32)
+        gt_mid_points = np.zeros((cfg.max_annotation, cfg.num_points // 2, 2), dtype=np.float32)
         ignore_tags = np.zeros((cfg.max_annotation,), dtype=np.int32)
 
         if polygons is None:
@@ -156,6 +191,12 @@ class TextDataset(object):
             polygon.points[:, 0] = np.clip(polygon.points[:, 0], 1, w - 2)
             polygon.points[:, 1] = np.clip(polygon.points[:, 1], 1, h - 2)
             gt_points[idx, :, :] = polygon.get_sample_point(size=(h, w))
+            try:
+                polys = self.check_poly(polygon.points)
+                
+                gt_mid_points[idx, :, :] = self.get_gt_midline(polys)
+            except ValueError:
+                gt_mid_points[idx, :, :] = self.get_gt_midline(gt_points[idx, :, :])
             cv2.fillPoly(tr_mask, [polygon.points.astype(np.int32)], color=(idx + 1,))
 
             inst_mask = mask_zeros.copy()
@@ -183,11 +224,11 @@ class TextDataset(object):
         # ### background ######
         weight_matrix[tr_mask == 0] = 1. / np.sqrt(np.sum(tr_mask == 0))
         train_mask = np.clip(train_mask, 0, 1)
-        distance_field = np.clip(distance_field, 0, 1)
         # edge_field[np.logical_and(distance_field<0.1,distance_field>0)] = 1
+
         return train_mask, tr_mask, \
                distance_field, direction_field, \
-               weight_matrix, gt_points, proposal_points, ignore_tags, edge_field
+               weight_matrix, gt_points, proposal_points, ignore_tags, gt_mid_points, edge_field
 
     def get_training_data(self, image, polygons, image_id=None, image_path=None):
         np.random.seed()
@@ -197,7 +238,7 @@ class TextDataset(object):
 
         train_mask, tr_mask, \
         distance_field, direction_field, \
-        weight_matrix, gt_points, proposal_points, ignore_tags, edge_field = self.make_text_region(image, polygons)
+        weight_matrix, gt_points, proposal_points, ignore_tags, gt_mid_points, edge_field = self.make_text_region(image, polygons)
 
         # # to pytorch channel sequence
         image = image.transpose(2, 0, 1)
@@ -211,10 +252,11 @@ class TextDataset(object):
         gt_points = torch.from_numpy(gt_points).float()
         proposal_points = torch.from_numpy(proposal_points).float()
         ignore_tags = torch.from_numpy(ignore_tags).int()
+        gt_mid_points = torch.from_numpy(gt_mid_points).float()
         edge_field = torch.from_numpy(edge_field).int()
-
+        
         return image, train_mask, tr_mask, distance_field, \
-               direction_field, weight_matrix, gt_points, proposal_points, ignore_tags, edge_field
+               direction_field, weight_matrix, gt_points, proposal_points, ignore_tags, gt_mid_points, edge_field
 
     def get_test_data(self, image, polygons=None, image_id=None, image_path=None):
         H, W, _ = image.shape
@@ -225,11 +267,9 @@ class TextDataset(object):
         points = np.zeros((cfg.max_annotation, 20, 2))
         length = np.zeros(cfg.max_annotation, dtype=int)
         label_tag = np.zeros(cfg.max_annotation, dtype=int)
-    
         if polygons is not None:
             for i, polygon in enumerate(polygons):
                 pts = polygon.points
-                
                 points[i, :pts.shape[0]] = polygon.points
                 length[i] = pts.shape[0]
                 if polygon.text != '#':
@@ -254,5 +294,3 @@ class TextDataset(object):
 
     def __len__(self):
         raise NotImplementedError()
-
-

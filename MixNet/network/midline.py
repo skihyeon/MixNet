@@ -10,8 +10,6 @@ from network.layers.gcn_utils import get_node_feature
 from util.misc import get_sample_point
 
 
-
-
 class midlinePredictor(nn.Module):
     def __init__(self, seg_channel):
         super(midlinePredictor, self).__init__()

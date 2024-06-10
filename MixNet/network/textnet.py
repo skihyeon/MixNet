@@ -9,6 +9,7 @@ from network.layers.model_block import FPN
 from network.layers.Transformer import Transformer
 from network.layers.gcn_utils import get_node_feature
 from util.misc import get_sample_point
+from .midline import midlinePredictor
 
 class Evolution(nn.Module):
     def __init__(self, node_num, seg_channel, is_training=True, device=None):
@@ -141,7 +142,10 @@ class TextNet(nn.Module):
             nn.Conv2d(16, 4, kernel_size=1, stride=1, padding=0),
         )
 
-        self.BPN = Evolution(cfg.num_points, seg_channel=32+4, is_training=is_training, device=cfg.device)
+        if cfg.mid:
+            self.BPN = midlinePredictor(seg_channel=32+4)
+        else:
+            self.BPN = Evolution(cfg.num_points, seg_channel=32+4, is_training=is_training, device=cfg.device)
 
     def load_model(self, model_path):
         print('Loading from {}'.format(model_path))
@@ -169,11 +173,16 @@ class TextNet(nn.Module):
 
         cnn_feats = torch.cat([up1, fy_preds], dim=1)
 
-        py_preds, inds, confidences = self.BPN(cnn_feats, input=input_dict, seg_preds=fy_preds, switch="gt")
+        if cfg.mid:
+            py_preds, inds, confidences, midline = self.BPN(cnn_feats, input=input_dict, seg_preds=fy_preds, switch="gt")
+        else:
+            py_preds, inds, confidences = self.BPN(cnn_feats, input=input_dict, seg_preds=fy_preds, switch="gt")
         
         output["fy_preds"] = fy_preds
         output["py_preds"] = py_preds
         output["inds"] = inds
         output["confidences"] = confidences
-
+        if cfg.mid:
+            output["midline"] = midline
+            
         return output

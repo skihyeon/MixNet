@@ -65,7 +65,7 @@ class BaseOptions(object):
         self.parser.add_argument('--scale', default=1, type=int, help='prediction on 1/scale feature map')
         self.parser.add_argument('--net', default='FSNet_M', type=str,
                                  choices=["FSNet_M", "FSNet_H_M","FSNet_hor"], help='Network architecture')
-        # self.parser.add_argument('--mid', default=False, type=str2bool, help='midline predict to Transformer')
+        self.parser.add_argument('--mid', default=False, type=str2bool, help='midline predict to Transformer')
         # self.parser.add_argument('--embed', default=False, type=str2bool, help='predict embeding value for training')
         # self.parser.add_argument('--know', default=False, type=str2bool, help='Knowledge Distillation')
         # self.parser.add_argument('--onlybackbone', default=False, type=str2bool, help='skip the Transformer block, only train the FSNet. ')
