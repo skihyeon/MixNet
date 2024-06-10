@@ -25,6 +25,9 @@ def visualize_network_output(output_dict, input_dict, mode='train'):
     init_polys = output_dict["py_preds"][0]
     inds = output_dict["inds"]
 
+    if cfg.mid == True:
+        midline = output_dict["midline"]
+
     image = input_dict['img']
     tr_mask = input_dict['tr_mask'].data.cpu().numpy() > 0
     distance_field = input_dict['distance_field'].data.cpu().numpy()
@@ -96,6 +99,8 @@ def visualize_network_output(output_dict, input_dict, mode='train'):
             cv2.drawContours(image_show, init_py.astype(np.int32), -1, (0, 125, 125), 2)
             cv2.drawContours(image_show, gt_py.astype(np.int32), -1, (255, 125, 0), 2)
             cv2.drawContours(image_show, contours.astype(np.int32), -1, (0, 255, 125), 2)
+            if cfg.mid == True:
+                cv2.polylines(image_show, midline.astype(np.int32), False, (125, 255, 0), 2)
             shows.append(image_show)
 
         for idx, im_show in enumerate(shows):
@@ -133,6 +138,9 @@ def visualize_detection(image, output_dict, meta=None, infer=None):
     init_polys = output_dict["py_preds"][0]
     shows = []
 
+    if cfg.mid:
+        midline = output_dict["midline"]
+
     init_py = init_polys.data.cpu().numpy()
     path = os.path.join(cfg.vis_dir, '{}_test'.format(cfg.exp_name),
                         meta['image_id'][0].split(".")[0] + "_init.png")
@@ -164,6 +172,11 @@ def visualize_detection(image, output_dict, meta=None, infer=None):
                     cv2.circle(im_show, (int(pp[0]), int(pp[1])), 2, (125, 255, 125), -1)
                 else:
                     cv2.circle(im_show, (int(pp[0]), int(pp[1])), 2, (255, 125, 125), -1)
+        if cfg.mid:
+            for ppt in midline:
+                for pt in ppt:
+                    cv2.circle(im_show, (int(pt[0]), int(pt[1])), 3, (255, 0, 0), -1)
+
         path = os.path.join(cfg.vis_dir, '{}_test'.format(cfg.exp_name),
                              meta['image_id'][0].split(".")[0] + "_{}iter.png".format(idx))
         # cv2.imwrite(path, im_show)
