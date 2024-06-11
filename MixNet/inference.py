@@ -107,6 +107,8 @@ def inference_folder(model, folder_path, output_dir):
             inference(model, image_path, output_dir)
 
 
+import time
+
 def main(image_path):
     cudnn.benchmark = False
     model = TextNet(is_training=False, backbone=cfg.net)
@@ -117,13 +119,16 @@ def main(image_path):
     model.eval()
     with torch.no_grad():
         print('Start infer MixNet.')
+        start_time = time.time()  # 시작 시간 기록
         if os.path.isdir(image_path): ## 폴더 입력 시 해당 폴더 내 모든 이미지 처리
             output_dir = image_path + '/' + cfg.exp_name + '_result/'
             mkdirs(output_dir)
             inference_folder(model, image_path, output_dir)
         else: ## 이미지 파일 입력 시 해당 이미지 처리
             output_dir = os.path.dirname(image_path)
-            inference(model, image_path, output_dir)    
+            inference(model, image_path, output_dir)
+        end_time = time.time()  # 종료 시간 기록
+        print(f'총 inference 수행 시간: {end_time - start_time:.2f}초')
 
 
 if __name__ == "__main__":
