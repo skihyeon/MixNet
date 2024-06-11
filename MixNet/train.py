@@ -39,7 +39,7 @@ def save_model(model, epoch, lr):
 
 def load_model(model, model_path):
     print(f"Loading from {model_path}")
-    state_dict = torch.load(model_path)
+    state_dict = torch.load(model_path,  map_location=cfg.device)
     try:
         model.load_state_dict(state_dict['model'])
     except RuntimeError as e:
