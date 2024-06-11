@@ -41,7 +41,7 @@ config.max_annotation = 700
 config.adj_num = 4
 
 # control points number
-config.num_points = 20
+config.num_points = 100
 
 # use hard examples (annotated as '#')
 config.use_hard = True
