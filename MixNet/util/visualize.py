@@ -163,15 +163,15 @@ def visualize_detection(image, output_dict, meta=None, infer=None):
     for idx, py in enumerate(py_preds):
         im_show = im_show0.copy()
         contours = py.data.cpu().numpy()
-        cv2.drawContours(im_show, contours.astype(np.int32), -1, (255, 0, 255), 2)
+        cv2.drawContours(im_show, contours.astype(np.int32), -1, (0, 0, 255), 2)
         for ppts in contours:
             for j, pp in enumerate(ppts):
                 if j == 0:
-                    cv2.circle(im_show, (int(pp[0]), int(pp[1])), 2, (125, 125, 255), -1)
+                    cv2.circle(im_show, (int(pp[0]), int(pp[1])), 1, (0, 0, 255), -1)
                 elif j == 1:
-                    cv2.circle(im_show, (int(pp[0]), int(pp[1])), 2, (125, 255, 125), -1)
+                    cv2.circle(im_show, (int(pp[0]), int(pp[1])), 1, (0, 0, 255), -1)
                 else:
-                    cv2.circle(im_show, (int(pp[0]), int(pp[1])), 2, (255, 125, 125), -1)
+                    cv2.circle(im_show, (int(pp[0]), int(pp[1])), 1, (0, 0, 255), -1)
         # if cfg.mid:
         #     for ppt in midline:
         #         for pt in ppt:
