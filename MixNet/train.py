@@ -23,12 +23,15 @@ from tqdm.auto import tqdm
 from torch.utils.tensorboard import SummaryWriter
 from util.augmentation import Augmentation
 
-accelerator = Accelerator()
+accelerator = Accelerator(device_placement=True)
 
 def save_model(model, epoch, lr):
     save_dir = os.path.join(cfg.save_dir, cfg.exp_name)
     if not os.path.exists(save_dir):
         mkdirs(save_dir)
+    
+    if accelerator.state.distributed_type == "MULTI_GPU":
+        model = accelerator.unwrap_model(model)
     
     save_path = os.path.join(save_dir, f'MixNet_{model.backbone_name}_{epoch}.pth')
     print(f'Saving to {save_path}')
@@ -38,6 +41,25 @@ def save_model(model, epoch, lr):
         'model' : model.state_dict()
     }
     torch.save(state_dict, save_path)
+
+
+# def save_model(model, epoch, lr):
+#     save_dir = os.path.join(cfg.save_dir, cfg.exp_name)
+#     os.makedirs(save_dir, exist_ok=True)
+    
+#     if isinstance(model, torch.nn.parallel.DistributedDataParallel):
+#         model_without_ddp = model.module
+#     else:
+#         model_without_ddp = model
+    
+#     save_path = os.path.join(save_dir, f'MixNet_{model_without_ddp.backbone_name}_{epoch}.pth')
+#     print(f'Saving to {save_path}')
+#     state_dict = {
+#         'lr' : lr,
+#         'epoch' : epoch,
+#         'model' : model.state_dict()
+#     }
+#     torch.save(state_dict, save_path)
 
 def load_model(model, model_path):
     print(f"Loading from {model_path}")
@@ -49,7 +71,8 @@ def load_model(model, model_path):
 
 def _parse_data(inputs):
     input_dict = {}
-    inputs = list(map(lambda x: to_device(x), inputs))
+    # inputs = list(map(lambda x: to_device(x), inputs))
+    inputs = list(map(lambda x: accelerator.prepare(x), inputs))
     input_dict['img'] = inputs[0]
     input_dict['train_mask'] = inputs[1]
     input_dict['tr_mask'] = inputs[2]
@@ -106,7 +129,7 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch, writer):
 
 def main():
     global lr
-    torch.cuda.set_device(cfg.device)
+    # torch.cuda.set_device(cfg.device)
 
     if not cfg.mid:
         trainset = myDataset(
@@ -134,8 +157,8 @@ def main():
                                        pin_memory=True, generator=torch.Generator(device=cfg.device))
     
     model = TextNet(backbone=cfg.net, is_training=True, freeze_backbone=cfg.freeze_backbone)
-    model = model.to(cfg.device)
-    criterion = TextLoss()
+    # model = model.to(cfg.device)
+    criterion = TextLoss(accelerator)
 
     writer = SummaryWriter(log_dir=os.path.join(cfg.save_dir, cfg.exp_name, 'logs'))
 
@@ -152,7 +175,7 @@ def main():
     
     scheduler = lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.9)
 
-    model, optimizer, train_loader = accelerator.prepare(model, optimizer, train_loader)
+    model, optimizer, train_loader, criterion = accelerator.prepare(model, optimizer, train_loader, criterion)
 
     print('Start training MixNet.')
     for epoch in range(cfg.start_epoch, cfg.max_epoch+1):

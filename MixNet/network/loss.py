@@ -10,14 +10,14 @@ import pytorch_ssim
 
 
 class TextLoss(nn.Module):
-    def __init__(self):
+    def __init__(self, accelerator):
         super().__init__()
         self.MSE_loss = torch.nn.MSELoss(reduce=False, size_average=False)
         self.BCE_loss = torch.nn.BCELoss(reduce=False, size_average=False)
-        self.PolyMatchingLoss = PolyMatchingLoss(cfg.num_points, cfg.device)
+        self.PolyMatchingLoss = PolyMatchingLoss(cfg.num_points, cfg.device, accelerator)
         self.ssim = pytorch_ssim.SSIM()
         self.overlap_loss = overlap_loss()
-
+        
     @staticmethod
     def single_image_loss(pre_loss, loss_label):
         batch_size = pre_loss.shape[0]
@@ -84,7 +84,8 @@ class TextLoss(nn.Module):
         img_poly[..., 1] = img_poly[..., 1] / (h / 2.) - 1
 
         batch_size = energy_field.size(0)
-        gcn_feature = torch.zeros([img_poly.size(0), energy_field.size(1), img_poly.size(1)]).to(img_poly.device)
+        # gcn_feature = torch.zeros([img_poly.size(0), energy_field.size(1), img_poly.size(1)]).to(img_poly.device)
+        gcn_feature = torch.zeros([img_poly.size(0), energy_field.size(1), img_poly.size(1)])
         for i in range(batch_size):
             poly = img_poly[ind == i].unsqueeze(0)
             gcn_feature[ind == i] = torch.nn.functional.grid_sample(energy_field[i:i + 1], poly)[0].permute(1, 0, 2)
