@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.backends.cudnn as cudnn
 import torch.utils.data as data
 from torch.optim import lr_scheduler
-
+from accelerate import Accelerator
 
 from dataset.open_data import TotalText
 from dataset.my_dataset import myDataset
@@ -23,17 +23,19 @@ from tqdm.auto import tqdm
 from torch.utils.tensorboard import SummaryWriter
 from util.augmentation import Augmentation
 
+accelerator = Accelerator()
+
 def save_model(model, epoch, lr):
     save_dir = os.path.join(cfg.save_dir, cfg.exp_name)
     if not os.path.exists(save_dir):
         mkdirs(save_dir)
     
     save_path = os.path.join(save_dir, f'MixNet_{model.backbone_name}_{epoch}.pth')
-    print(f'Saving tp {save_path}')
+    print(f'Saving to {save_path}')
     state_dict = {
         'lr' : lr,
         'epoch' : epoch,
-        'model' : model.state_dict() if not cfg.mgpu else model.module.state_dict()
+        'model' : model.state_dict()
     }
     torch.save(state_dict, save_path)
 
@@ -43,9 +45,7 @@ def load_model(model, model_path):
     try:
         model.load_state_dict(state_dict['model'])
     except RuntimeError as e:
-        # print("Missing key in state_dict, try to load with strict = False")
         model.load_state_dict(state_dict['model'], strict = False)
-        # print(e)
 
 def _parse_data(inputs):
     input_dict = {}
@@ -63,9 +63,6 @@ def _parse_data(inputs):
         input_dict['gt_mid_points'] = inputs[9]
         input_dict['edge_field'] = inputs[10]
     return input_dict
-
-
-
 
 def train(model, train_loader, criterion, scheduler, optimizer, epoch, writer):
     global train_step
@@ -88,7 +85,7 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch, writer):
         loss = loss_dict["total_loss"]
 
         optimizer.zero_grad()
-        loss.backward()
+        accelerator.backward(loss)
 
         torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.grad_clip)
         optimizer.step()
@@ -107,25 +104,16 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch, writer):
     if epoch % cfg.save_freq == 0:
         save_model(model, epoch, scheduler.get_lr())
 
-
 def main():
     global lr
     torch.cuda.set_device(cfg.device)
-    # trainset = AllDataset(config=cfg, custom_data_root="./data/kor", open_data_root="./data/open_datas", is_training=True, load_memory=cfg.load_memory)
-    
-    # trainset = TotalText(
-    #     data_root = "./data/open_datas/totaltext",
-    #     is_training=True,
-    #     transform=Augmentation(size=cfg.input_size, mean=cfg.means, std=cfg.stds),
-    #     load_memory = cfg.load_memory
-    # )
 
     if not cfg.mid:
         trainset = myDataset(
             data_root = "./data/kor_extended",
-        is_training=True,
-        transform=Augmentation(size=cfg.input_size, mean=cfg.means, std=cfg.stds),
-        load_memory = cfg.load_memory
+            is_training=True,
+            transform=Augmentation(size=cfg.input_size, mean=cfg.means, std=cfg.stds),
+            load_memory = cfg.load_memory
         )
 
     if cfg.mid:
@@ -151,9 +139,6 @@ def main():
 
     writer = SummaryWriter(log_dir=os.path.join(cfg.save_dir, cfg.exp_name, 'logs'))
 
-    if cfg.mgpu:
-        model = nn.DataParallel(model, device_ids=[int(i) for i in cfg.device_ids])
-
     if cfg.cuda:
         cudnn.benchmark = True
     if cfg.resume:
@@ -166,6 +151,8 @@ def main():
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     
     scheduler = lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.9)
+
+    model, optimizer, train_loader = accelerator.prepare(model, optimizer, train_loader)
 
     print('Start training MixNet.')
     for epoch in range(cfg.start_epoch, cfg.max_epoch+1):
