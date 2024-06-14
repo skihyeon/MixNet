@@ -27,11 +27,11 @@ class BaseOptions(object):
         self.parser = argparse.ArgumentParser()
 
         # basic opts
-        self.parser.add_argument('--exp_name', default="Test", type=str, help='Experiment name')
+        self.parser.add_argument('--exp_name', default="ConcatDatas", type=str, help='Experiment name')
         self.parser.add_argument('--resume', default=None, type=str, help='Path to target resume checkpoint')
         # self.parser.add_argument('--dataset_name', default=None, type=str, help='dataset_name, under ./data/')
 
-        self.parser.add_argument('--num_workers', default=0, type=int, help='Number of workers used in dataloading')
+        self.parser.add_argument('--num_workers', default=32, type=int, help='Number of workers used in dataloading')
         self.parser.add_argument('--cuda', default=True, type=str2bool, help='Use cuda to train model')
         self.parser.add_argument('--mgpu', action='store_true', help='Use multi-gpu to train model')
         self.parser.add_argument('--save_dir', default='./model/', help='Path to save checkpoint models')
@@ -45,15 +45,15 @@ class BaseOptions(object):
         self.parser.add_argument('--viz', default=True, type=str2bool, help='Whether to output debug info')
 
         # train opts
-        self.parser.add_argument('--max_epoch', default=1, type=int, help='Max epochs')
-        self.parser.add_argument('--lr', '--learning-rate', default=1e-3, type=float, help='initial learning rate')
+        self.parser.add_argument('--max_epoch', default=1000, type=int, help='Max epochs')
+        self.parser.add_argument('--lr', '--learning-rate', default=1e-4, type=float, help='initial learning rate')
         # self.parser.add_argument('--lr_adjust', default='fix',
                                 #  choices=['fix', 'poly'], type=str, help='Learning Rate Adjust Strategy')
         # self.parser.add_argument('--stepvalues', default=[], nargs='+', type=int, help='# of iter to change lr')
         # self.parser.add_argument('--weight_decay', '--wd', default=0., type=float, help='Weight decay for SGD')
         # self.parser.add_argument('--gamma', default=0.1, type=float, help='Gamma update for SGD lr')
         # self.parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
-        self.parser.add_argument('--batch_size', default=1, type=int, help='Batch size for training')
+        self.parser.add_argument('--batch_size', default=2, type=int, help='Batch size for training')
         # self.parser.add_argument('--optim', default='Adam', type=str, choices=['SGD', 'Adam'], help='Optimizer')
         self.parser.add_argument('--save_freq', default=5, type=int, help='save weights every # epoch')
         # self.parser.add_argument('--display_freq', default=10, type=int, help='display training metrics every # iter')
@@ -63,7 +63,7 @@ class BaseOptions(object):
 
         # backbone
         self.parser.add_argument('--scale', default=1, type=int, help='prediction on 1/scale feature map')
-        self.parser.add_argument('--net', default='FSNet_M', type=str,
+        self.parser.add_argument('--net', default='FSNet_H_M', type=str,
                                  choices=["FSNet_M", "FSNet_H_M","FSNet_hor"], help='Network architecture')
         self.parser.add_argument('--mid', default=False, type=str2bool, help='midline predict to Transformer')
         # self.parser.add_argument('--embed', default=False, type=str2bool, help='predict embeding value for training')
@@ -72,8 +72,8 @@ class BaseOptions(object):
         # data args
         self.parser.add_argument('--load_memory', default=False, type=str2bool, help='Load data into memory')
         self.parser.add_argument('--rescale', type=float, default=255.0, help='rescale factor')
-        self.parser.add_argument('--input_size', default=640, type=int, help='model input size')
-        self.parser.add_argument('--test_size', default=[640, 960], type=int, nargs='+', help='test size')
+        self.parser.add_argument('--input_size', default=768, type=int, help='model input size')
+        self.parser.add_argument('--test_size', default=[768, 1152], type=int, nargs='+', help='test size')
 
         # eval args00
         self.parser.add_argument('--checkepoch', default=1070, type=int, help='Load checkpoint number')

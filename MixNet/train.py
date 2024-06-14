@@ -8,6 +8,7 @@ import torch.utils.data as data
 from torch.optim import lr_scheduler
 from accelerate import Accelerator
 
+from dataset.concat_datasets import AllDataset
 from dataset.open_data import TotalText
 from dataset.my_dataset import myDataset
 from dataset.my_dataset_mid import myDataset_mid
@@ -132,12 +133,13 @@ def main():
     # torch.cuda.set_device(cfg.device)
 
     if not cfg.mid:
-        trainset = myDataset(
-            data_root = "./data/kor_extended",
-            is_training=True,
-            transform=Augmentation(size=cfg.input_size, mean=cfg.means, std=cfg.stds),
-            load_memory = cfg.load_memory
-        )
+        # trainset = myDataset(
+        #     data_root = "./data/kor_extended",
+        #     is_training=True,
+        #     transform=Augmentation(size=cfg.input_size, mean=cfg.means, std=cfg.stds),
+        #     load_memory = cfg.load_memory
+        # )
+        trainset = AllDataset(config=cfg, custom_data_root="./data/kor_extended", open_data_root="./data/open_datas", is_training=True, load_memory=cfg.load_memory)
 
     if cfg.mid:
         trainset = myDataset_mid(
