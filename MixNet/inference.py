@@ -13,7 +13,7 @@ from cfglib.option import BaseOptions
 from util.augmentation import BaseTransform
 from util.visualize import visualize_detection
 from util.misc import mkdirs, rescale_result
-
+from tqdm.auto import tqdm
 multiprocessing.set_start_method("spawn", force=True)
 
     
@@ -74,7 +74,7 @@ def inference(model, image_path, output_dir):
     with torch.no_grad():
         output_dict = model(input_dict)
     
-    print(f'{image_path} processing...', end='\r', flush=True)
+    # print(f'{image_path} processing...', end='\r', flush=True)
     img_show = image.transpose(1, 2, 0)
     img_show = ((img_show * cfg.stds + cfg.means) * 255).astype(np.uint8)
 
@@ -104,7 +104,7 @@ def inference(model, image_path, output_dir):
     
 
 def inference_folder(model, folder_path, output_dir):
-    for filename in os.listdir(folder_path):
+    for filename in tqdm(os.listdir(folder_path)):
         if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.PNG', '.JPG', '.JPEG')):
             image_path = os.path.join(folder_path, filename)
             inference(model, image_path, output_dir)

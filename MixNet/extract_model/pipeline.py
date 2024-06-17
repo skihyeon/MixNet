@@ -89,7 +89,7 @@ def find_text(model, image_path, device):
 
 
 def extract_polygons(image_path, bbox_coords):
-    output_dir = './vis/extracted'
+    output_dir = '../vis/extracted'
     cropped_results = []
 
     if not os.path.exists(output_dir):
@@ -301,7 +301,7 @@ if __name__ == '__main__':
     # cv2.waitKey(0)
     # cv2.destroyAllWindows()
     opt = Opt()
-    ocr_model = load_ocrmodel('./extract_model/default.pth')
+    ocr_model = load_ocrmodel('default.pth')
     pred, _ = img_list_prediction(cropped_images, ocr_model,[], opt)
     # print(pred)
     with open('result.txt', 'w', encoding='utf-8') as f:

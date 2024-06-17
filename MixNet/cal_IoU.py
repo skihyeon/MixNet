@@ -122,7 +122,8 @@ if __name__ == '__main__':
     exp_name = args.exp_name
     # pred_root = './output/only_kor_H_M_mid_extended_later/'
     # pred_root = f'./output/{exp_name}/'
-    pred_root = 'C:/Users/ys/Desktop/sgh/MixNet/MixNet/gghj_craft'
+    pred_root = './gghj_part/image/only_kor_H_M_mid_extended_later_result/text'
+    # pred_root = './gghj_craft/'
     gt_root = './gghj_part/gt/'
 
     th = 0.5

@@ -1,5 +1,6 @@
 exp_name="only_kor_H_M_mid_extended_later"
-echo "\n \n start $exp_name" >> cal_IoU_res.txt
+start_time=$(date '+%Y-%m-%d %H:%M:%S')
+echo "\n \n $start_time || $exp_name" >> cal_IoU_res.txt
 
 for i in 190 195 196 200 240 245 250
 
