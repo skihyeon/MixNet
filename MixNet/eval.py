@@ -16,7 +16,6 @@ from cfglib.option import BaseOptions
 from util.visualize import visualize_detection, visualize_gt
 from util.misc import mkdirs,rescale_result
 from util.augmentation import BaseTransform
-from cal_IoU import evaluate_iou
 
 import multiprocessing
 multiprocessing.set_start_method("spawn", force=True)
@@ -100,33 +99,17 @@ def inference(model, test_loader, output_dir):
 
         fname = meta['image_id'][idx].replace('jpg', 'txt').replace('JPG', 'txt').replace('PNG', 'txt').replace('png', 'txt').replace('jpeg', 'txt')
         write_to_file(contours, os.path.join(output_dir, fname))
-        
-        iou_score = evaluate_iou(contours, gt_contour)
-        iou_scores.extend(iou_score)
-
-        avg_iou = np.mean(iou_score)
 
         hit_rate = len(contours)/len(gt_contour) if gt_contour else 0
         hit_rates.append(hit_rate)
-        # print('detect {} / {} images: {}. ({:.2f} fps) / 평균 IoU: {:.2f}'.format(i + 1, len(test_loader), meta['image_id'][idx], fps, avg_iou), end='\r', flush=True)
-        # print('Index {} / {},  images: {}. / IoU: {:.2f} / Hit!: {:.2f}%'.format(i + 1, len(test_loader), meta['image_id'][idx], avg_iou, hit_rate*100))
-        print('Index {} / {},  images: {}. / Hit!: {:.2f}%'.format(i + 1, len(test_loader), meta['image_id'][idx], hit_rate*100))
 
-    print("평균 적중률: {:.2f}".format(np.mean(hit_rates)))
-    print("평균 IoU: {:.4f}, 평균 적중률: {:.2f}".format(np.mean(iou_scores), np.mean(hit_rates)))
-    with open(os.path.join(output_dir, "/result_IoU.txt"), 'w') as f:
-        f.write("평균 IoU: {:.4f}, 평균 적중률: {:.2f}".format(np.mean(iou_scores), np.mean(hit_rates)))
+        print('Index {} / {},  images: {}. / Hit!: {:.2f}%'.format(i + 1, len(test_loader), meta['image_id'][idx], hit_rate*100), end = '\r', flush = True)
+
+    print("평균 적중률: {:.2f}".format(np.mean(hit_rates)), end = '\r', flush = True)
 
 
 
 def main(vis_dir_path):
-    # testset = TotalText(
-    #     data_root = 'data/totaltext',
-    #     is_training=False,
-    #     load_memory=cfg.load_memory,
-    #     transform=BaseTransform(size=cfg.test_size, mean=cfg.means, std=cfg.stds)
-    # )
-    # testset = AllDataset(config=cfg, custom_data_root="./data/kor", open_data_root="./data/open_datas", is_training=False)
     if cfg.eval_dataset == 'totaltext': 
         testset = TotalText(
             data_root = './data/open_datas/totaltext',

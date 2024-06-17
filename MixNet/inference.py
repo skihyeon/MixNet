@@ -74,7 +74,7 @@ def inference(model, image_path, output_dir):
     with torch.no_grad():
         output_dict = model(input_dict)
     
-    print(f'{image_path} processing...')
+    print(f'{image_path} processing...', end='\r', flush=True)
     img_show = image.transpose(1, 2, 0)
     img_show = ((img_show * cfg.stds + cfg.means) * 255).astype(np.uint8)
 
@@ -95,7 +95,10 @@ def inference(model, image_path, output_dir):
     if tmp.ndim == 2:
         tmp = np.expand_dims(tmp, axis=2)
     
-    fname = path.replace('jpg', 'txt')
+    txt_folder = os.path.join(output_dir, 'text/')
+    if not os.path.exists(txt_folder):
+        os.makedirs(txt_folder)
+    fname = os.path.join(txt_folder, path.split('/')[-1].split(".")[0].replace('_infered', '') + '.txt')
 
     write_to_file(contours, fname)
     

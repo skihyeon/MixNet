@@ -45,6 +45,16 @@ class myDataset(TextDataset):
             label = field['inferText']
             polygons.append(TextInstance(poly, 'c', label))
         return polygons
+    
+    def make_txt(self, gt_path, polygons):
+        txt_path = gt_path.replace('.json', '').replace('.jpg', '').replace('.jpeg', '').replace('.png', '').replace('.PNG', '').replace('.JPG', '').replace('JPEG', '') + '.txt'
+        if not os.path.exists(txt_path):
+            with open(txt_path, 'w', encoding='utf-8') as f:
+                for poly in polygons:
+                    points = poly.points.flatten()
+                    points_str = ','.join(map(str, points))
+                    f.write(f"{points_str},{poly.label}\n")
+
 
     def load_img_gt(self, item):
         image_path = os.path.join(self.image_root, self.image_list[item])
@@ -63,6 +73,7 @@ class myDataset(TextDataset):
 
         annotation_path = self.annotation_list[item]
         polygons = self.parse_json(annotation_path)
+        self.make_txt(annotation_path, polygons)
 
         data = dict()
         data["image"] = image
@@ -103,7 +114,7 @@ if __name__ == '__main__':
     transform = lambda img, polygons=None: ((img / 255.0 - means) / stds, polygons)
 
     trainset = myDataset(
-        data_root='../data/kor',
+        data_root='../data/kor_extended',
         is_training=True,
         transform=transform,
     )
