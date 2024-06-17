@@ -56,7 +56,7 @@ def input_reading_mod(input_dir, input):
 def gt_reading_mod(gt_dir, gt_id):
     """This helper reads groundtruths from json files"""
     gt_id = gt_id.split('.')[0]
-    extensions = ['jpg', 'JPG', 'PNG', 'png']
+    extensions = ['jpg', 'JPG', 'PNG', 'png', 'jpeg']
     for ext in extensions:
         json_path = f'{gt_dir}/{gt_id}.{ext}.json'
         if os.path.exists(json_path):

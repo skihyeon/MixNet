@@ -98,7 +98,7 @@ def inference(model, test_loader, output_dir):
         if tmp.ndim == 2:
             tmp = np.expand_dims(tmp, axis=2)
 
-        fname = meta['image_id'][idx].replace('jpg', 'txt').replace('JPG', 'txt').replace('PNG', 'txt').replace('png', 'txt')
+        fname = meta['image_id'][idx].replace('jpg', 'txt').replace('JPG', 'txt').replace('PNG', 'txt').replace('png', 'txt').replace('jpeg', 'txt')
         write_to_file(contours, os.path.join(output_dir, fname))
         
         # iou_score = evaluate_iou(contours, gt_contour)

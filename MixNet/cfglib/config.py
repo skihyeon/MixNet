@@ -10,13 +10,13 @@ config.stds = (0.229, 0.224, 0.225)
 config.gpu = "1"
 
 # Experiment name #
-config.exp_name = "Test"
+config.exp_name = "ConcatDatas"
 
 # dataloader jobs number
-config.num_workers = 24
+config.num_workers = 32
 
 # batch_size
-config.batch_size = 12
+config.batch_size = 2
 
 # training epoch number
 config.max_epoch = 1

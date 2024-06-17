@@ -5,7 +5,7 @@ import torch.nn.functional as F
 
 
 class PolyMatchingLoss(nn.Module):
-    def __init__(self, pnum, device, loss_type="L1"):
+    def __init__(self, pnum, device, accelerator, loss_type="L1"):
         super(PolyMatchingLoss, self).__init__()
 
         self.pnum = pnum
@@ -13,6 +13,7 @@ class PolyMatchingLoss(nn.Module):
         self.loss_type = loss_type
         self.smooth_L1 = F.smooth_l1_loss
         self.L2_loss = torch.nn.MSELoss(reduce=False, size_average=False)
+        self.accelerator = accelerator
 
         batch_size = 1
         pidxall = np.zeros(shape=(batch_size, pnum, pnum), dtype=np.int32)
@@ -21,13 +22,17 @@ class PolyMatchingLoss(nn.Module):
                 pidx = (np.arange(pnum) + i) % pnum
                 pidxall[b, i] = pidx
 
-        pidxall = torch.from_numpy(np.reshape(pidxall, newshape=(batch_size, -1))).to(device)
-        self.feature_id = pidxall.unsqueeze_(2).long().expand(pidxall.size(0), pidxall.size(1), 2).detach()
+        # pidxall = torch.from_numpy(np.reshape(pidxall, newshape=(batch_size, -1))).to(device)
+        pidxall = torch.from_numpy(np.reshape(pidxall, newshape=(batch_size, -1)))
+        # self.feature_id = pidxall.unsqueeze_(2).long().expand(pidxall.size(0), pidxall.size(1), 2).detach()
+        self.feature_id = pidxall.unsqueeze_(2).long().expand(pidxall.size(0), pidxall.size(1), 2)
+        self.feature_id = self.feature_id.to(accelerator.device)
 
     def match_loss(self, pred, gt):
         batch_size = pred.shape[0]
         feature_id = self.feature_id.expand(batch_size, self.feature_id.size(1), 2)
-
+        
+        gt = gt.to(self.accelerator.device)
         gt_expand = torch.gather(gt, 1, feature_id).view(batch_size, self.pnum, self.pnum, 2)
         pred_expand = pred.unsqueeze(1)
 
