@@ -8,7 +8,6 @@ import torch.backends.cudnn as cudnn
 import torch.utils.data as data
 from dataset.concat_datasets import AllDataset
 from dataset.my_dataset import myDataset
-from dataset.open_data import TotalText
 from network.textnet import TextNet
 from cfglib.config import config as cfg, update_config
 
@@ -110,13 +109,8 @@ def inference(model, test_loader, output_dir):
 
 
 def main(vis_dir_path):
-    if cfg.eval_dataset == 'totaltext': 
-        testset = TotalText(
-            data_root = './data/open_datas/totaltext',
-            is_training=False,
-            load_memory=cfg.load_memory,
-            transform=BaseTransform(size=cfg.test_size, mean=cfg.means, std=cfg.stds)
-        )
+    if cfg.eval_dataset == 'All': 
+        testset = AllDataset(config=cfg, custom_data_root="./data/kor_extended", open_data_root="./data/open_datas", is_training=False, load_memory=cfg.load_memory)
     elif cfg.eval_dataset == 'my':
         testset = myDataset(
             data_root = './data/kor_extended',
