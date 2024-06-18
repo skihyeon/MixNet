@@ -4,3 +4,6 @@ from .TotalText import TotalText
 from .SROIE2019 import SROIE2019
 from .FUNSD import FUNSD
 from .XFUND import XFUND
+from .FUNSD_mid import FUNSD_mid
+from .SROIE2019_mid import SROIE2019_mid
+from .XFUND_mid import XFUND_mid

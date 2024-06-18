@@ -2,21 +2,18 @@ import os
 import time
 import torch
 import numpy as np
-import torch.nn as nn
 import torch.backends.cudnn as cudnn
 import torch.utils.data as data
 from torch.optim import lr_scheduler
 from accelerate import Accelerator
 
-from dataset.concat_datasets import AllDataset
-from dataset.open_data import TotalText
-from dataset.my_dataset import myDataset
+from dataset.concat_datasets import AllDataset, AllDataset_mid
 from dataset.my_dataset_mid import myDataset_mid
-from network.loss import TextLoss, knowledge_loss
+from network.loss import TextLoss
 from network.textnet import TextNet
 from cfglib.config import config as cfg, update_config, print_config
 from util.misc import AverageMeter
-from util.misc import mkdirs, to_device
+from util.misc import mkdirs
 from util.visualize import visualize_network_output
 from cfglib.option import BaseOptions
 
@@ -43,24 +40,6 @@ def save_model(model, epoch, lr):
     }
     torch.save(state_dict, save_path)
 
-
-# def save_model(model, epoch, lr):
-#     save_dir = os.path.join(cfg.save_dir, cfg.exp_name)
-#     os.makedirs(save_dir, exist_ok=True)
-    
-#     if isinstance(model, torch.nn.parallel.DistributedDataParallel):
-#         model_without_ddp = model.module
-#     else:
-#         model_without_ddp = model
-    
-#     save_path = os.path.join(save_dir, f'MixNet_{model_without_ddp.backbone_name}_{epoch}.pth')
-#     print(f'Saving to {save_path}')
-#     state_dict = {
-#         'lr' : lr,
-#         'epoch' : epoch,
-#         'model' : model.state_dict()
-#     }
-#     torch.save(state_dict, save_path)
 
 def load_model(model, model_path):
     print(f"Loading from {model_path}")
@@ -130,24 +109,12 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch, writer):
 
 def main():
     global lr
-    # torch.cuda.set_device(cfg.device)
 
     if not cfg.mid:
-        # trainset = myDataset(
-        #     data_root = "./data/kor_extended",
-        #     is_training=True,
-        #     transform=Augmentation(size=cfg.input_size, mean=cfg.means, std=cfg.stds),
-        #     load_memory = cfg.load_memory
-        # )
         trainset = AllDataset(config=cfg, custom_data_root="./data/kor_extended", open_data_root="./data/open_datas", is_training=True, load_memory=cfg.load_memory)
 
     if cfg.mid:
-        trainset = myDataset_mid(
-            data_root = "./data/kor_extended",
-            is_training=True,
-            transform=Augmentation(size=cfg.input_size, mean=cfg.means, std=cfg.stds),
-            load_memory = cfg.load_memory
-        )
+        trainset = AllDataset_mid(config=cfg, custom_data_root="./data/kor_extended", open_data_root="./data/open_datas", is_training=True, load_memory=cfg.load_memory)
 
     if cfg.server_code == 24:       ## 24 서버 Torch 버전 문제로 인해 Generator 호환 X
         train_loader = data.DataLoader(trainset, batch_size=cfg.batch_size,
