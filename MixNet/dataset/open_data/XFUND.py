@@ -25,7 +25,7 @@ class XFUND(TextDataset):
         self.image_root = os.path.join(data_root, 'Train' if is_training else 'Test')
         # self.annotation_root = os.path.join(data_root, 'dataset', 'training_data/annotations' if is_training else 'testing_data/annotations')
         languages = ['de', 'es', 'fr', 'it', 'ja', 'pt', 'zh']
-        suffix = 'train.json' if is_training else 'test.json'
+        suffix = 'train.json' if is_training else 'val.json'
         self.annotation_list = [os.path.join(data_root, f'{lang}.{suffix}') for lang in languages]
         self.image_list = os.listdir(self.image_root)
         self.image_list = list(filter(lambda img: img.replace('.jpg', '') not in ignore_list, self.image_list))
@@ -58,6 +58,15 @@ class XFUND(TextDataset):
                             polygons.append(TextInstance(poly, 'c', label))
         return polygons
     
+    def make_txt(self, gt_path, polygons):
+        txt_path = gt_path.replace('.json', '').replace('.jpg', '').replace('.jpeg', '').replace('.png', '').replace('.PNG', '').replace('.JPG', '').replace('JPEG', '') + '.txt'
+        if not os.path.exists(gt_path):
+            with open(gt_path, 'w', encoding='utf-8') as f:
+                for poly in polygons:
+                    points = poly.points.flatten()
+                    points_str = ','.join(map(str, points))
+                    f.write(f"{points_str}\n")
+
     def load_img_gt(self, item):
         image_path = os.path.join(self.image_root, self.image_list[item])
         if os.name == 'nt':  # 윈도우일 경우
@@ -76,6 +85,7 @@ class XFUND(TextDataset):
         lang = image_id.split('_')[0]  # 이미지 ID에서 언어 추출
         data = self.json_data[lang]  # 미리 로드된 JSON 데이터 사용
         polygons = self.parse_json(data, image_id)
+        self.make_txt(image_path.split("\\")[0].split('/')[-1] + '/annotations/' + image_id + '.txt', polygons)
 
         data = dict()
         data["image"] = image

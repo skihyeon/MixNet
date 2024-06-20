@@ -44,6 +44,15 @@ class FUNSD(TextDataset):
             polygons.append(TextInstance(poly, 'c', label))
         return polygons
     
+    def make_txt(self, gt_path, polygons):
+        txt_path = gt_path.replace('.json', '').replace('.jpg', '').replace('.jpeg', '').replace('.png', '').replace('.PNG', '').replace('.JPG', '').replace('JPEG', '') + '.txt'
+        if not os.path.exists(txt_path):
+            with open(txt_path, 'w', encoding='utf-8') as f:
+                for poly in polygons:
+                    points = poly.points.flatten()
+                    points_str = ','.join(map(str, points))
+                    f.write(f"{points_str}\n")
+
     def load_img_gt(self, item):
         image_path = os.path.join(self.image_root, self.image_list[item])
         if os.name == 'nt':  # 윈도우일 경우
@@ -61,7 +70,7 @@ class FUNSD(TextDataset):
 
         annotation_path = self.annotation_list[item]
         polygons = self.parse_json(annotation_path)
-
+        self.make_txt(annotation_path, polygons)
         data = dict()
         data["image"] = image
         data["polygons"] = polygons
@@ -94,9 +103,7 @@ if __name__ == '__main__':
     means = (0.485, 0.456, 0.406)
     stds = (0.229, 0.224, 0.225)
 
-    transform = Augmentation(
-        size=640, mean=means, std=stds
-    )
+    transform = lambda img, polygons=None: ((img / 255.0 - means) / stds, polygons)
 
     trainset = FUNSD(
         data_root='../../data/open_datas/FUNSD',
