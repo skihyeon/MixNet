@@ -110,7 +110,11 @@ def inference(model, test_loader, output_dir):
 
 def main(vis_dir_path):
     if cfg.eval_dataset == 'All': 
-        testset = AllDataset(config=cfg, custom_data_root="./data/kor_extended", open_data_root="./data/open_datas", is_training=False, load_memory=cfg.load_memory)
+        testset = AllDataset(config=cfg, 
+                             custom_data_root="./data/kor_extended", 
+                             open_data_root="./data/open_datas", 
+                             is_training=False, 
+                             load_memory=cfg.load_memory)
     elif cfg.eval_dataset == 'my':
         testset = myDataset(
             data_root = './data/kor_extended',

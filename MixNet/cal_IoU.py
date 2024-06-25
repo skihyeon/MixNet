@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import warnings
 from tqdm import tqdm
 import argparse
-
+from multiprocessing import Pool
 # RuntimeWarning 무시
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
@@ -113,71 +113,67 @@ def iou(det_x, det_y, gt_x, gt_y):
         return 0.0
     return intersection_area / union_area
                 
+def process_file(args):
+    pred_path, gt_root, th = args
+    preds = get_pred(pred_path)
+    gt_path = gt_root + pred_path.split('/')[-1].split('.')[0] + '.txt'
+    gts, tags = get_gt(gt_path)
+
+    ta = len(preds)
+    tb = len(gts)
+    matched_preds = [False] * len(preds)
+    matched_gts = [False] * len(gts)
+    tp = 0
+    
+    for gt_idx, (gt, tag) in enumerate(zip(gts, tags)):
+        gt = np.array(gt).reshape(-1, 2)
+        
+        max_iou = 0
+        max_iou_idx = -1
+        
+        for pred_idx, pred in enumerate(preds):
+            if matched_preds[pred_idx]:
+                continue
+                
+            pred = np.array(pred).reshape(-1, 2)
+            iou_value = iou(pred[:, 0], pred[:, 1], gt[:, 0], gt[:, 1])
+            
+            if iou_value > max_iou:
+                max_iou = iou_value
+                max_iou_idx = pred_idx
+        
+        if max_iou >= th:
+            matched_preds[max_iou_idx] = True
+            matched_gts[gt_idx] = True
+            tp += 1
+    
+    fn = matched_gts.count(False)
+    fp = matched_preds.count(False)
+    
+    return tp, fp, fn, ta, tb
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-
     parser.add_argument('exp_name', type=str)
-    
     args = parser.parse_args()
-    exp_name = args.exp_name
-    # pred_root = './output/only_kor_H_M_mid_extended_later/'
-    # pred_root = f'./output/{exp_name}/'
-    pred_root = './gghj_part/image/only_kor_H_M_mid_extended_later_result/text'
-    # pred_root = './gghj_craft/'
-    gt_root = './gghj_part/gt/'
-
+    
+    pred_root = './output/ConcatDatas/'
+    gt_root = './data/kor_extended/Test/gt/'
+    # pred_root = './infer_test_datas/gghj_part/image/only_kor_H_M_mid_extended_later_result/text/'
+    # gt_root = './infer_test_datas/gghj_part/gt/'
     th = 0.5
+    
     pred_list = read_dir(pred_root)
-
-    count, tp, fp, fn, ta, tb = 0, 0, 0, 0, 0, 0
-    for pred_path in tqdm(pred_list, total=len(pred_list)):
-        count += 1
-        preds = get_pred(pred_path)
-        gt_path = gt_root + pred_path.split('/')[-1].split('.')[0] + '.txt'
-        gts, tags = get_gt(gt_path)
-
-        ta += len(preds)  # total annotation
-        tb += len(gts)
-        matched_preds = [False] * len(preds)
-        matched_gts = [False] * len(gts)
-        
-        for gt_idx, (gt, tag) in enumerate(zip(gts, tags)):
-            gt = np.array(gt).reshape(-1, 2)
-            difficult = tag
-            
-            max_iou = 0
-            max_iou_idx = -1
-            
-            for pred_idx, pred in enumerate(preds):
-                if matched_preds[pred_idx]:
-                    continue
-                    
-                pred = np.array(pred).reshape(-1, 2)
-                # 시각화 코드 추가
-                # fig, ax = plt.subplots()
-                # ax.plot(gt[:, 0], gt[:, 1], 'b-', label='Ground Truth')
-                # ax.plot(pred[:, 0], pred[:, 1], 'r-', label='Prediction')
-                # ax.set_title('GT vs Pred')
-                # ax.legend()
-                # plt.show()
-                iou_value = iou(pred[:, 0], pred[:, 1], gt[:, 0], gt[:, 1])
-                
-                if iou_value > max_iou:
-                    max_iou = iou_value
-                    max_iou_idx = pred_idx
-            
-            if max_iou >= th:
-                matched_preds[max_iou_idx] = True
-                matched_gts[gt_idx] = True
-                tp += 1
-        
-        fn += matched_gts.count(False)
-        fp += matched_preds.count(False) 
-
+    
+    with Pool() as pool:
+        results = list(tqdm(pool.imap(process_file, [(pred_path, gt_root, th) for pred_path in pred_list]), total=len(pred_list)))
+    
+    tp, fp, fn, ta, tb = map(sum, zip(*results))
+    
     print(f'tp: {tp}, fp: {fp}, fn: {fn}, total annotation: {ta}, total bbox: {tb}')
     precision = float(tp) / (tp + fp)
     recall = float(tp) / (tp + fn)
     
     hmean = 0 if (precision + recall) == 0 else 2.0 * precision * recall / (precision + recall)
-
+    
     print('p: %.4f, r: %.4f, f: %.4f' % (precision, recall, hmean))
