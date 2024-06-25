@@ -229,7 +229,9 @@ class TextDataset(object):
         if polygons is not None:
             for i, polygon in enumerate(polygons):
                 pts = polygon.points
-                
+                if i >= points.shape[0]:
+                    print(f"{image_id} Index {i} is out of bounds for axis 0 with size {points.shape[0]}")
+                    break
                 points[i, :pts.shape[0]] = polygon.points
                 length[i] = pts.shape[0]
                 if polygon.text != '#':

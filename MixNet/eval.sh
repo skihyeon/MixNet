@@ -1,0 +1,2 @@
+# python inference.py --exp_name ConcatDatas --checkepoch 60 --num_workers 4 --infer_path infer_test_datas/images --num_points 100 
+python eval.py --exp_name ConcatDatas --checkepoch 60 --num_workers 4 --eval_dataset my --num_points 100 
