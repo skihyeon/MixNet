@@ -43,7 +43,8 @@ def save_model(model, epoch, lr):
 
 def load_model(model, model_path):
     print(f"Loading from {model_path}")
-    state_dict = torch.load(model_path,  map_location=cfg.device)
+    # state_dict = torch.load(model_path,  map_location=cfg.device)
+    state_dict = torch.load(model_path, map_location=accelerator.device)
     try:
         model.load_state_dict(state_dict['model'])
     except RuntimeError as e:
@@ -87,6 +88,9 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch, writer):
         loss_dict = criterion(input_dict, output_dict, eps=epoch+1)
         loss = loss_dict["total_loss"]
 
+        # if torch.isnan(loss):
+            # print(f"NaN loss detected at batch {i}, image id: {input_dict['image_id']}")
+
         optimizer.zero_grad()
         accelerator.backward(loss)
 
@@ -109,12 +113,20 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch, writer):
 
 def main():
     global lr
+    torch.autograd.set_detect_anomaly(True)
 
-    if not cfg.mid:
-        trainset = AllDataset(config=cfg, custom_data_root="./data/kor_extended", open_data_root="./data/open_datas", is_training=True, load_memory=cfg.load_memory)
+    if not cfg.temp:
+        if not cfg.mid:
+            trainset = AllDataset(config=cfg, custom_data_root="./data/kor_extended", open_data_root="./data/open_datas", is_training=True, load_memory=cfg.load_memory)
 
-    if cfg.mid:
-        trainset = AllDataset_mid(config=cfg, custom_data_root="./data/kor_extended", open_data_root="./data/open_datas", is_training=True, load_memory=cfg.load_memory)
+        elif cfg.mid:
+            trainset = AllDataset_mid(config=cfg, custom_data_root="./data/kor_extended", open_data_root="./data/open_datas", is_training=True, load_memory=cfg.load_memory)
+
+    elif cfg.temp:
+        trainset = myDataset_mid(data_root="./data/kor_extended",
+                                 is_training=True, 
+                                 load_memory=cfg.load_memory,
+                                 transform=Augmentation(size=cfg.input_size, mean=cfg.means, std=cfg.stds))
 
     if cfg.server_code == 24:       ## 24 서버 Torch 버전 문제로 인해 Generator 호환 X
         train_loader = data.DataLoader(trainset, batch_size=cfg.batch_size,

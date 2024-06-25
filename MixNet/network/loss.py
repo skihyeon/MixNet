@@ -18,34 +18,58 @@ class TextLoss(nn.Module):
         self.ssim = pytorch_ssim.SSIM()
         self.overlap_loss = overlap_loss()
         
+    # @staticmethod
+    # def single_image_loss(pre_loss, loss_label):
+    #     batch_size = pre_loss.shape[0]
+    #     sum_loss = torch.mean(pre_loss.view(-1)) * 0
+    #     pre_loss = pre_loss.view(batch_size, -1)
+    #     loss_label = loss_label.view(batch_size, -1)
+    #     eps = 0.001
+    #     for i in range(batch_size):
+    #         average_number = 0
+    #         positive_pixel = len(pre_loss[i][(loss_label[i] >= eps)])
+    #         average_number += positive_pixel
+    #         if positive_pixel != 0:
+    #             posi_loss = torch.mean(pre_loss[i][(loss_label[i] >= eps)])
+    #             sum_loss += posi_loss
+    #             if len(pre_loss[i][(loss_label[i] < eps)]) < 3 * positive_pixel:
+    #                 nega_loss = torch.mean(pre_loss[i][(loss_label[i] < eps)])
+    #                 average_number += len(pre_loss[i][(loss_label[i] < eps)])
+    #             else:
+    #                 nega_loss = torch.mean(torch.topk(pre_loss[i][(loss_label[i] < eps)], 3 * positive_pixel)[0])
+    #                 average_number += 3 * positive_pixel
+    #             sum_loss += nega_loss
+    #         else:
+    #             nega_loss = torch.mean(torch.topk(pre_loss[i], 100)[0])
+    #             average_number += 100
+    #             sum_loss += nega_loss
+
+    #     return sum_loss/batch_size
+
     @staticmethod
     def single_image_loss(pre_loss, loss_label):
         batch_size = pre_loss.shape[0]
-        sum_loss = torch.mean(pre_loss.view(-1)) * 0
+        sum_loss = torch.zeros(1, device=pre_loss.device)
         pre_loss = pre_loss.view(batch_size, -1)
         loss_label = loss_label.view(batch_size, -1)
         eps = 0.001
         for i in range(batch_size):
-            average_number = 0
-            positive_pixel = len(pre_loss[i][(loss_label[i] >= eps)])
-            average_number += positive_pixel
-            if positive_pixel != 0:
-                posi_loss = torch.mean(pre_loss[i][(loss_label[i] >= eps)])
+            positive_pixel = (loss_label[i] >= eps).sum().item()
+            if positive_pixel > 0:
+                posi_loss = pre_loss[i][loss_label[i] >= eps].mean()
                 sum_loss += posi_loss
-                if len(pre_loss[i][(loss_label[i] < eps)]) < 3 * positive_pixel:
-                    nega_loss = torch.mean(pre_loss[i][(loss_label[i] < eps)])
-                    average_number += len(pre_loss[i][(loss_label[i] < eps)])
+                neg_pixels = (loss_label[i] < eps).sum().item()
+                if neg_pixels < 3 * positive_pixel:
+                    nega_loss = pre_loss[i][loss_label[i] < eps].mean()
                 else:
-                    nega_loss = torch.mean(torch.topk(pre_loss[i][(loss_label[i] < eps)], 3 * positive_pixel)[0])
-                    average_number += 3 * positive_pixel
+                    nega_loss = pre_loss[i][loss_label[i] < eps].topk(3 * positive_pixel)[0].mean()
                 sum_loss += nega_loss
             else:
-                nega_loss = torch.mean(torch.topk(pre_loss[i], 100)[0])
-                average_number += 100
+                nega_loss = pre_loss[i].topk(100)[0].mean()
                 sum_loss += nega_loss
 
-        return sum_loss/batch_size
-
+        return sum_loss / batch_size
+    
     def cls_ohem(self, predict, target, train_mask, negative_ratio=3.):
         pos = (target * train_mask).bool()
         neg = ((1 - target) * train_mask).bool()
@@ -63,19 +87,35 @@ class TextLoss(nn.Module):
 
         return (loss_pos + loss_neg.sum()) / (n_pos + n_neg).float()
 
+    # @staticmethod
+    # def loss_calc_flux(pred_flux, gt_flux, weight_matrix, mask, train_mask):
+    #     gt_flux = 0.999999 * gt_flux / (gt_flux.norm(p=2, dim=1).unsqueeze(1) + 1e-3)
+    #     norm_loss = weight_matrix * torch.mean((pred_flux - gt_flux) ** 2, dim=1)*train_mask
+    #     norm_loss = norm_loss.sum(-1).mean()
+
+    #     mask = train_mask * mask
+    #     pred_flux = 0.999999 * pred_flux / (pred_flux.norm(p=2, dim=1).unsqueeze(1) + 1e-3)
+
+    #     angle_loss = (1 - torch.cosine_similarity(pred_flux, gt_flux, dim=1))
+    #     angle_loss = angle_loss[mask].mean()
+
+    #     return norm_loss, angle_loss
+
     @staticmethod
     def loss_calc_flux(pred_flux, gt_flux, weight_matrix, mask, train_mask):
-        gt_flux = 0.999999 * gt_flux / (gt_flux.norm(p=2, dim=1).unsqueeze(1) + 1e-3)
-        norm_loss = weight_matrix * torch.mean((pred_flux - gt_flux) ** 2, dim=1)*train_mask
+        eps = 1e-6
+        gt_flux = gt_flux / (gt_flux.norm(p=2, dim=1, keepdim=True) + eps)
+        norm_loss = weight_matrix * torch.mean((pred_flux - gt_flux) ** 2, dim=1) * train_mask
         norm_loss = norm_loss.sum(-1).mean()
 
         mask = train_mask * mask
-        pred_flux = 0.999999 * pred_flux / (pred_flux.norm(p=2, dim=1).unsqueeze(1) + 1e-3)
+        pred_flux = pred_flux / (pred_flux.norm(p=2, dim=1, keepdim=True) + eps)
 
         angle_loss = (1 - torch.cosine_similarity(pred_flux, gt_flux, dim=1))
         angle_loss = angle_loss[mask].mean()
 
         return norm_loss, angle_loss
+
 
     @staticmethod
     def get_poly_energy(energy_field, img_poly, ind, h, w):
@@ -105,27 +145,47 @@ class TextLoss(nn.Module):
 
         return (energy_loss+regular_loss)/len(energys[1:])
 
+    # def dice_loss(self, x, target, mask):
+    #     b = x.shape[0]
+    #     x = torch.sigmoid(x)
+
+    #     x = x.contiguous().reshape(b, -1)
+    #     target = target.contiguous().reshape(b, -1)
+    #     mask = mask.contiguous().reshape(b, -1)
+
+    #     x = x * mask
+    #     target = target.float()
+    #     target = target * mask
+
+    #     a = torch.sum(x * target, 1)
+    #     b = torch.sum(x * x, 1) + 0.001
+    #     c = torch.sum(target * target, 1) + 0.001
+    #     d = (2 * a) / (b + c)
+
+    #     loss = 1 - d
+    #     loss = torch.mean(loss)
+    #     return loss
+
     def dice_loss(self, x, target, mask):
+        eps = 1e-6
         b = x.shape[0]
         x = torch.sigmoid(x)
 
-        x = x.contiguous().reshape(b, -1)
-        target = target.contiguous().reshape(b, -1)
-        mask = mask.contiguous().reshape(b, -1)
+        x = x.contiguous().view(b, -1)
+        target = target.contiguous().view(b, -1)
+        mask = mask.contiguous().view(b, -1)
 
         x = x * mask
-        target = target.float()
-        target = target * mask
+        target = target.float() * mask
 
         a = torch.sum(x * target, 1)
-        b = torch.sum(x * x, 1) + 0.001
-        c = torch.sum(target * target, 1) + 0.001
+        b = torch.sum(x * x, 1) + eps
+        c = torch.sum(target * target, 1) + eps
         d = (2 * a) / (b + c)
 
         loss = 1 - d
-        loss = torch.mean(loss)
-        return loss
-
+        return loss.mean()
+    
     def forward(self, input_dict, output_dict, eps=None):
 
         fy_preds = output_dict["fy_preds"]
@@ -170,13 +230,26 @@ class TextLoss(nn.Module):
         h, w = distance_field.size(1) * cfg.scale, distance_field.size(2) * cfg.scale
         energy_loss = self.loss_energy_regularization(distance_field, py_preds, inds[0], h, w)
 
-        alpha = 1.0; beta = 3.0; theta=0.5; 
+        # alpha = 1.0; beta = 3.0; theta=0.5; 
+        # if eps is None:
+        #     gama = 0.05; 
+        # else:
+        #     gama = 0.1*torch.sigmoid(torch.tensor((eps - cfg.max_epoch)/cfg.max_epoch))
+        # loss = alpha*cls_loss + beta*(dis_loss) + theta*(norm_loss + angle_loss) + gama*(point_loss + energy_loss)
+        alpha = 1.0
+        beta = 3.0
+        theta = 0.5
         if eps is None:
-            gama = 0.05; 
+            gama = 0.05
         else:
-            gama = 0.1*torch.sigmoid(torch.tensor((eps - cfg.max_epoch)/cfg.max_epoch))
-        loss = alpha*cls_loss + beta*(dis_loss) + theta*(norm_loss + angle_loss) + gama*(point_loss + energy_loss)
-
+            eps_tensor = torch.tensor((eps - cfg.max_epoch) / cfg.max_epoch, device=input_dict['train_mask'].device)
+            gama = 0.1 * torch.sigmoid(torch.clamp(eps_tensor, min=-20, max=20))
+        
+        loss = alpha*cls_loss + beta*dis_loss + theta*(norm_loss + angle_loss) + gama*(point_loss + energy_loss)
+        
+        
+        
+        
         loss_dict = {
             'total_loss': loss,
             'cls_loss': alpha*cls_loss,
@@ -190,15 +263,33 @@ class TextLoss(nn.Module):
 
         return loss_dict
 
+# class knowledge_loss(nn.Module):
+#     def __init__(self, T):
+#         super().__init__()
+#         self.KLDloss = torch.nn.KLDivLoss(size_average = False)
+#         self.T = T
+#     def forward(self, pred, know):
+#         log_pred = F.log_softmax(pred / self.T, dim = 1)
+#         sftknow = F.softmax(know / self.T, dim=1)
+#         kldloss = self.KLDloss(log_pred, sftknow)
+#         # print(pred.shape)
+#         kldloss = kldloss * (self.T**2) / (pred.shape[0] * pred.shape[2] * pred.shape[3])
+#         return kldloss    
+
+
 class knowledge_loss(nn.Module):
     def __init__(self, T):
         super().__init__()
-        self.KLDloss = torch.nn.KLDivLoss(size_average = False)
+        self.KLDloss = torch.nn.KLDivLoss(reduction='sum')
         self.T = T
+    
     def forward(self, pred, know):
-        log_pred = F.log_softmax(pred / self.T, dim = 1)
+        eps = 1e-8
+        pred = torch.clamp(pred, min=-100, max=100)
+        know = torch.clamp(know, min=-100, max=100)
+        
+        log_pred = F.log_softmax(pred / self.T, dim=1)
         sftknow = F.softmax(know / self.T, dim=1)
         kldloss = self.KLDloss(log_pred, sftknow)
-        # print(pred.shape)
-        kldloss = kldloss * (self.T**2) / (pred.shape[0] * pred.shape[2] * pred.shape[3])
-        return kldloss    
+        kldloss = kldloss * (self.T**2) / (pred.shape[0] * pred.shape[2] * pred.shape[3] + eps)
+        return kldloss

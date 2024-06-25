@@ -42,7 +42,7 @@ class BaseOptions(object):
         # self.parser.add_argument('--pretrain', default=False, type=str2bool, help='Pretrained AutoEncoder model')
         # self.parser.add_argument('--verbose', '-v', default=True, type=str2bool, help='Whether to output debug info')
         # self.parser.add_argument('--viz', default=True, help='Whether to output debug info')
-        self.parser.add_argument('--viz', default=True, type=str2bool, help='Whether to output debug info')
+        self.parser.add_argument('--viz', default=False, type=str2bool, help='Whether to output debug info')
 
         # train opts
         self.parser.add_argument('--max_epoch', default=1000, type=int, help='Max epochs')
@@ -91,6 +91,7 @@ class BaseOptions(object):
         self.parser.add_argument('--gpu_num', default='2', type=str, help='GPU number')
         self.parser.add_argument('--eval_dataset', default=None, choices=['All', 'my'],type=str, help='Eval dataset')
         self.parser.add_argument('--num_points', default=20, type=int, help ='sampling points')
+        self.parser.add_argument('--temp', default=False, type=str2bool, help='temp')
     def parse(self, fixed=None):
 
         if fixed is not None:

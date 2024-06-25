@@ -109,6 +109,7 @@ def concat_open_datas_mid(config, data_root: str = "data/open_datas", is_trainin
     )
 
     return ConcatDataset([tr2, tr3, tr4])
+    # return ConcatDataset([tr2, tr3])
 
 
 def AllDataset_mid(config, custom_data_root: str="data/kor", open_data_root: str="data/open_datas", is_training: bool = True,  load_memory: bool = False):
