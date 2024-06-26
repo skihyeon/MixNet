@@ -46,9 +46,12 @@ def get_pred(path):
         if line == '':
             continue
         bbox = line.split(',')
+        x_min, y_min = int(np.min(np.array(bbox[0::2], dtype=np.int))), int(np.min(np.array(bbox[1::2], dtype=np.int)))
+        x_max, y_max = int(np.max(np.array(bbox[0::2], dtype=np.int))), int(np.max(np.array(bbox[1::2], dtype=np.int)))
         if len(bbox) % 2 == 1:
             print(path)
-        bbox = [int(x) for x in bbox]
+        # bbox = [int(x) for x in bbox]
+        bbox = [(x_min, y_min), (x_max, y_min), (x_max, y_max), (x_min, y_max)] 
         bboxes.append(bbox)
     return bboxes
 
@@ -126,7 +129,7 @@ def process_file(args):
     tp = 0
     
     for gt_idx, (gt, tag) in enumerate(zip(gts, tags)):
-        gt = np.array(gt).reshape(-1, 2)
+        gt = np.array(gt, dtype=np.int32).reshape(-1, 2)
         
         max_iou = 0
         max_iou_idx = -1
@@ -135,7 +138,7 @@ def process_file(args):
             if matched_preds[pred_idx]:
                 continue
                 
-            pred = np.array(pred).reshape(-1, 2)
+            pred = np.array(pred, dtype=np.int32).reshape(-1, 2)
             iou_value = iou(pred[:, 0], pred[:, 1], gt[:, 0], gt[:, 1])
             
             if iou_value > max_iou:
@@ -154,13 +157,13 @@ def process_file(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('exp_name', type=str)
+    # parser.add_argument('exp_name', type=str)
+    parser.add_argument('--pred_root', type=str)
+    parser.add_argument('--gt_root', type=str)
     args = parser.parse_args()
-    
-    pred_root = './output/ConcatDatas/'
-    gt_root = './data/kor_extended/Test/gt/'
-    # pred_root = './infer_test_datas/gghj_part/image/only_kor_H_M_mid_extended_later_result/text/'
-    # gt_root = './infer_test_datas/gghj_part/gt/'
+
+    pred_root = args.pred_root
+    gt_root = args.gt_root
     th = 0.5
     
     pred_list = read_dir(pred_root)
@@ -172,7 +175,7 @@ if __name__ == '__main__':
     
     print(f'tp: {tp}, fp: {fp}, fn: {fn}, total annotation: {ta}, total bbox: {tb}')
     precision = float(tp) / (tp + fp)
-    recall = float(tp) / (tp + fn)
+    recall = float(tp) / ta
     
     hmean = 0 if (precision + recall) == 0 else 2.0 * precision * recall / (precision + recall)
     

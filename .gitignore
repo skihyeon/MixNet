@@ -8,3 +8,8 @@ __pycache__/
 *.py[cod]
 *.pyc
 /MixNet/cfglib/config.py
+*.log
+*.txt
+*.jpg
+*.png
+*.pth
