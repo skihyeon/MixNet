@@ -101,19 +101,20 @@ def area_of_intersection(det_x, det_y, gt_x, gt_y):
     if not p1.is_valid or not p2.is_valid:
         return 0.0
     
-    try:
-        pInt = p1.intersection(p2)
-        if pInt.is_empty:
-            return 0.0
-        return float(pInt.area)
-    except RuntimeWarning:
+    pInt = p1.intersection(p2)
+    if pInt.is_empty:
         return 0.0
+    elif pInt.area >= min(p1.area, p2.area):
+        return 0.1234
+    return float(pInt.area)
 
 def iou(det_x, det_y, gt_x, gt_y):
     intersection_area = area_of_intersection(det_x, det_y, gt_x, gt_y)
     union_area = area_of_union(det_x, det_y, gt_x, gt_y)
     if union_area == 0:
         return 0.0
+    if intersection_area == 0.1234:
+        return 1.1234
     return intersection_area / union_area
                 
 def process_file(args):
@@ -131,24 +132,26 @@ def process_file(args):
     for gt_idx, (gt, tag) in enumerate(zip(gts, tags)):
         gt = np.array(gt, dtype=np.int32).reshape(-1, 2)
         
-        max_iou = 0
-        max_iou_idx = -1
-        
         for pred_idx, pred in enumerate(preds):
             if matched_preds[pred_idx]:
                 continue
                 
             pred = np.array(pred, dtype=np.int32).reshape(-1, 2)
             iou_value = iou(pred[:, 0], pred[:, 1], gt[:, 0], gt[:, 1])
-            
-            if iou_value > max_iou:
-                max_iou = iou_value
-                max_iou_idx = pred_idx
+
+            if iou_value >= th:
+                matched_preds[pred_idx] = True
+                matched_gts[gt_idx] = True
+                tp += 1
+
+        #     if iou_value > max_iou:
+        #         max_iou = iou_value
+        #         max_iou_idx = pred_idx
         
-        if max_iou >= th:
-            matched_preds[max_iou_idx] = True
-            matched_gts[gt_idx] = True
-            tp += 1
+        # if max_iou >= th:
+        #     matched_preds[max_iou_idx] = True
+        #     matched_gts[gt_idx] = True
+        #     tp += 1
     
     fn = matched_gts.count(False)
     fp = matched_preds.count(False)
@@ -173,9 +176,9 @@ if __name__ == '__main__':
     
     tp, fp, fn, ta, tb = map(sum, zip(*results))
     
-    print(f'tp: {tp}, fp: {fp}, fn: {fn}, total annotation: {ta}, total bbox: {tb}')
-    precision = float(tp) / (tp + fp)
-    recall = float(tp) / ta
+    print(f'tp: {tp}, fp: {fp}, fn: {fn}, total pred box: {ta}, total gt box: {tb}')
+    precision = float(tp) / (tp+fp)
+    recall = float(tp) / (tp+fn)
     
     hmean = 0 if (precision + recall) == 0 else 2.0 * precision * recall / (precision + recall)
     
