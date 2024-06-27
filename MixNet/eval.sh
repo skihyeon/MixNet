@@ -2,26 +2,26 @@
 # python eval.py --exp_name cwk --checkepoch 105 --num_workers 4 --eval_dataset my --num_points 100 --mid True
 
 
-exp_name="cwk"
+exp_name="ConcatDatas_mid_w_kor"
 eval_dataset="All"
 
-for i in 65 70 75 80 85 90 95 100 105
+for i in 100 105 110
 do
     echo "" >> iou.log
     echo "epoch: $i, exp_name: $exp_name data: $eval_dataset" >> iou.log
-    python eval.py --exp_name $exp_name --checkepoch $i --num_workers 4 --eval_dataset $eval_dataset --num_points 100 --mid True
-    python cal_IoU.py --pred_root ./output/$exp_name --gt_root ./data/kor_extended/Test/gt/ >> iou.log
+    python eval.py --exp_name $exp_name --checkepoch $i --num_workers 4 --eval_dataset $eval_dataset --num_points 100 --mid True --gpu_num 0 --test_size 2048 2048
+    python cal_IoU.py --pred_root ./output/$exp_name --gt_root ./data/open_datas/gts >> iou.log
 done
 
-exp_name="ConcatDatas"
+exp_name="only_kor_H_M_mid_extended_later"
 eval_dataset="All"
 
-for i in 60
+for i in 235 240 245
 do
     echo "" >> iou.log
     echo "epoch: $i, exp_name: $exp_name data: $eval_dataset" >> iou.log
-    python eval.py --exp_name $exp_name --checkepoch $i --num_workers 4 --eval_dataset $eval_dataset --num_points 100
-    python cal_IoU.py --pred_root ./output/$exp_name --gt_root ./data/open_datas/gts/ >> iou.log
+    python eval.py --exp_name $exp_name --checkepoch $i --num_workers 4 --eval_dataset $eval_dataset --num_points 100 --mid True --gpu_num 0 --test_size 2048 2048
+    python cal_IoU.py --pred_root ./output/$exp_name --gt_root ./data/open_datas/gts >> iou.log
 done
 
 

@@ -162,12 +162,14 @@ class TextNet(nn.Module):
             image = torch.zeros((b, c, cfg.test_size[1], cfg.test_size[1]), dtype=torch.float32).to(cfg.device)
             image[:, :, :h, :w] = input_dict["img"][:, :, :, :]
 
-        up1 = self.fpn(image)
+        # up1 = self.fpn(image)
+        up1 = torch.utils.checkpoint.checkpoint(self.fpn, image) ## 이건 문제 없음
         if cfg.know or knowledge:
             output["image_feature"] = up1
         if knowledge:
             return output
-        preds = self.seg_head(up1)
+        # preds = self.seg_head(up1)
+        preds = torch.utils.checkpoint.checkpoint(self.seg_head, up1) ## 여기도 문제 없음
 
         fy_preds = torch.cat([torch.sigmoid(preds[:, 0:2, :, :]), preds[:, 2:4, :, :]], dim=1)
 
@@ -175,6 +177,7 @@ class TextNet(nn.Module):
 
         if cfg.mid:
             py_preds, inds, confidences, midline = self.BPN(cnn_feats, input=input_dict, seg_preds=fy_preds, switch="gt")
+            # py_preds, inds, confidences, midline = torch.utils.checkpoint.checkpoint(self.BPN, cnn_feats, input_dict, fy_preds, "gt") ## 이게 문제임.
         else:
             py_preds, inds, confidences = self.BPN(cnn_feats, input=input_dict, seg_preds=fy_preds, switch="gt")
         

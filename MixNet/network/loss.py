@@ -145,46 +145,46 @@ class TextLoss(nn.Module):
 
         return (energy_loss+regular_loss)/len(energys[1:])
 
-    # def dice_loss(self, x, target, mask):
-    #     b = x.shape[0]
-    #     x = torch.sigmoid(x)
-
-    #     x = x.contiguous().reshape(b, -1)
-    #     target = target.contiguous().reshape(b, -1)
-    #     mask = mask.contiguous().reshape(b, -1)
-
-    #     x = x * mask
-    #     target = target.float()
-    #     target = target * mask
-
-    #     a = torch.sum(x * target, 1)
-    #     b = torch.sum(x * x, 1) + 0.001
-    #     c = torch.sum(target * target, 1) + 0.001
-    #     d = (2 * a) / (b + c)
-
-    #     loss = 1 - d
-    #     loss = torch.mean(loss)
-    #     return loss
-
     def dice_loss(self, x, target, mask):
-        eps = 1e-6
         b = x.shape[0]
         x = torch.sigmoid(x)
 
-        x = x.contiguous().view(b, -1)
-        target = target.contiguous().view(b, -1)
-        mask = mask.contiguous().view(b, -1)
+        x = x.contiguous().reshape(b, -1)
+        target = target.contiguous().reshape(b, -1)
+        mask = mask.contiguous().reshape(b, -1)
 
         x = x * mask
-        target = target.float() * mask
+        target = target.float()
+        target = target * mask
 
         a = torch.sum(x * target, 1)
-        b = torch.sum(x * x, 1) + eps
-        c = torch.sum(target * target, 1) + eps
+        b = torch.sum(x * x, 1) + 0.001
+        c = torch.sum(target * target, 1) + 0.001
         d = (2 * a) / (b + c)
 
         loss = 1 - d
-        return loss.mean()
+        loss = torch.mean(loss)
+        return loss
+
+    # def dice_loss(self, x, target, mask):
+    #     eps = 1e-6
+    #     b = x.shape[0]
+    #     x = torch.sigmoid(x)
+
+    #     x = x.contiguous().view(b, -1)
+    #     target = target.contiguous().view(b, -1)
+    #     mask = mask.contiguous().view(b, -1)
+
+    #     x = x * mask
+    #     target = target.float() * mask
+
+    #     a = torch.sum(x * target, 1)
+    #     b = torch.sum(x * x, 1) + eps
+    #     c = torch.sum(target * target, 1) + eps
+    #     d = (2 * a) / (b + c)
+
+    #     loss = 1 - d
+    #     return loss.mean()
     
     def forward(self, input_dict, output_dict, eps=None):
 
@@ -230,22 +230,22 @@ class TextLoss(nn.Module):
         h, w = distance_field.size(1) * cfg.scale, distance_field.size(2) * cfg.scale
         energy_loss = self.loss_energy_regularization(distance_field, py_preds, inds[0], h, w)
 
-        # alpha = 1.0; beta = 3.0; theta=0.5; 
-        # if eps is None:
-        #     gama = 0.05; 
-        # else:
-        #     gama = 0.1*torch.sigmoid(torch.tensor((eps - cfg.max_epoch)/cfg.max_epoch))
-        # loss = alpha*cls_loss + beta*(dis_loss) + theta*(norm_loss + angle_loss) + gama*(point_loss + energy_loss)
-        alpha = 1.0
-        beta = 3.0
-        theta = 0.5
+        alpha = 1.0; beta = 3.0; theta=0.5; 
         if eps is None:
-            gama = 0.05
+            gama = 0.05; 
         else:
-            eps_tensor = torch.tensor((eps - cfg.max_epoch) / cfg.max_epoch, device=input_dict['train_mask'].device)
-            gama = 0.1 * torch.sigmoid(torch.clamp(eps_tensor, min=-20, max=20))
+            gama = 0.1*torch.sigmoid(torch.tensor((eps - cfg.max_epoch)/cfg.max_epoch))
+        loss = alpha*cls_loss + beta*(dis_loss) + theta*(norm_loss + angle_loss) + gama*(point_loss + energy_loss)
+        # alpha = 1.0
+        # beta = 3.0
+        # theta = 0.5
+        # if eps is None:
+        #     gama = 0.05
+        # else:
+        #     eps_tensor = torch.tensor((eps - cfg.max_epoch) / cfg.max_epoch, device=input_dict['train_mask'].device)
+        #     gama = 0.1 * torch.sigmoid(torch.clamp(eps_tensor, min=-20, max=20))
         
-        loss = alpha*cls_loss + beta*dis_loss + theta*(norm_loss + angle_loss) + gama*(point_loss + energy_loss)
+        # loss = alpha*cls_loss + beta*dis_loss + theta*(norm_loss + angle_loss) + gama*(point_loss + energy_loss)
         
         
         

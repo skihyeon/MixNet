@@ -47,6 +47,7 @@ class BaseOptions(object):
         # train opts
         self.parser.add_argument('--max_epoch', default=1000, type=int, help='Max epochs')
         self.parser.add_argument('--lr', '--learning-rate', default=1e-4, type=float, help='initial learning rate')
+        self.parser.add_argument('--step_size', default=10, type=int, help='step size for learning rate decay')
         # self.parser.add_argument('--lr_adjust', default='fix',
                                 #  choices=['fix', 'poly'], type=str, help='Learning Rate Adjust Strategy')
         # self.parser.add_argument('--stepvalues', default=[], nargs='+', type=int, help='# of iter to change lr')

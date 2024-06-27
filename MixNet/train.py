@@ -5,7 +5,9 @@ import numpy as np
 import torch.backends.cudnn as cudnn
 import torch.utils.data as data
 from torch.optim import lr_scheduler
-from accelerate import Accelerator
+from accelerate import Accelerator, DistributedDataParallelKwargs
+
+import gc
 
 from dataset.concat_datasets import AllDataset, AllDataset_mid
 from dataset.my_dataset_mid import myDataset_mid
@@ -21,6 +23,8 @@ from tqdm.auto import tqdm
 from torch.utils.tensorboard import SummaryWriter
 from util.augmentation import Augmentation
 
+# ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
+# accelerator = Accelerator(device_placement=True ,kwargs_handlers=[ddp_kwargs])
 accelerator = Accelerator(device_placement=True)
 
 def save_model(model, epoch, lr):
@@ -42,13 +46,32 @@ def save_model(model, epoch, lr):
 
 
 def load_model(model, model_path):
-    print(f"Loading from {model_path}")
+    if accelerator.is_main_process:
+        print(f"Loading from {model_path}")
     # state_dict = torch.load(model_path,  map_location=cfg.device)
     state_dict = torch.load(model_path, map_location=accelerator.device)
     try:
         model.load_state_dict(state_dict['model'])
     except RuntimeError as e:
         model.load_state_dict(state_dict['model'], strict = False)
+
+# def load_model(model, model_path):
+#     print(f"가중치 파일 로드 중: {model_path}")
+#     state_dict = torch.load(model_path, map_location=accelerator.device)
+    
+#     # 기존 모델의 state_dict와 새 모델의 state_dict 키 비교
+#     model_dict = model.state_dict()
+#     pretrained_dict = {k: v for k, v in state_dict['model'].items() if k in model_dict}
+    
+#     # 새 모델의 state_dict 업데이트
+#     model_dict.update(pretrained_dict)
+    
+#     # 수정된 state_dict를 모델에 로드
+#     model.load_state_dict(model_dict, strict=False)
+    
+#     print("기존 가중치 로드 완료. 새로운 레이어는 초기화된 상태로 유지됩니다.")
+
+
 
 def _parse_data(inputs):
     input_dict = {}
@@ -77,25 +100,29 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch, writer):
     end = time.time()
     model.train()
 
-    print(f'Epoch: {epoch} : LR = {scheduler.get_lr()}')
+    if accelerator.is_main_process:
+        print(f'Epoch: {epoch} : LR = {scheduler.get_lr()}')
+
+    accumulation_steps = 4
+    optimizer.zero_grad()
 
     pbar = tqdm(train_loader, desc=f"Epoch {epoch}")
     for i, inputs in enumerate(pbar):
         data_time.update(time.time() - end)
         train_step = 1
         input_dict = _parse_data(inputs)
-        output_dict = model(input_dict)
-        loss_dict = criterion(input_dict, output_dict, eps=epoch+1)
-        loss = loss_dict["total_loss"]
 
-        # if torch.isnan(loss):
-            # print(f"NaN loss detected at batch {i}, image id: {input_dict['image_id']}")
+        with accelerator.accumulate(accumulation_steps):
+            output_dict = model(input_dict)
+            loss_dict = criterion(input_dict, output_dict, eps=epoch+1)
+            loss = loss_dict["total_loss"]
+            accelerator.backward(loss)
 
-        optimizer.zero_grad()
-        accelerator.backward(loss)
+        if (i+1) % accumulation_steps == 0:
+            optimizer.step()
+            optimizer.zero_grad()
 
         torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.grad_clip)
-        optimizer.step()
         losses.update(loss.item())
 
         batch_time.update(time.time()-end)
@@ -107,6 +134,11 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch, writer):
 
         pbar.set_postfix({'Training Loss': losses.avg})
         writer.add_scalar('Loss/train', losses.avg, epoch * len(train_loader) + i)
+
+        # 메모리 정리
+        del input_dict, output_dict, loss_dict, loss
+        torch.cuda.empty_cache()
+        gc.collect()
 
     if epoch % cfg.save_freq == 0:
         save_model(model, epoch, scheduler.get_lr())
@@ -139,8 +171,15 @@ def main():
     
     model = TextNet(backbone=cfg.net, is_training=True, freeze_backbone=cfg.freeze_backbone)
     # model = model.to(cfg.device)
-    criterion = TextLoss(accelerator)
 
+    criterion = TextLoss(accelerator)
+    lr = cfg.lr
+
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+
+    scheduler = lr_scheduler.StepLR(optimizer, step_size=cfg.step_size, gamma=0.9)
+
+    model, optimizer, train_loader, criterion = accelerator.prepare(model, optimizer, train_loader, criterion)
     writer = SummaryWriter(log_dir=os.path.join(cfg.save_dir, cfg.exp_name, 'logs'))
 
     if cfg.cuda:
@@ -150,15 +189,8 @@ def main():
     if cfg.freeze_backbone and not cfg.resume:
         assert "Freeze backbone is only available when resume is True"
 
-    lr = cfg.lr
-
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-    
-    scheduler = lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.9)
-
-    model, optimizer, train_loader, criterion = accelerator.prepare(model, optimizer, train_loader, criterion)
-
-    print('Start training MixNet.')
+    if accelerator.is_main_process:
+        print('Start training MixNet.')
     for epoch in range(cfg.start_epoch, cfg.max_epoch+1):
         scheduler.step()
         train(model, train_loader, criterion, scheduler, optimizer, epoch, writer)
@@ -177,7 +209,9 @@ if __name__ == "__main__":
     args = option.initialize()
 
     update_config(cfg, args)
-    print_config(cfg)
+    
+    if accelerator.is_main_process:
+        print_config(cfg)
 
     # main
     main()

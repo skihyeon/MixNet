@@ -46,8 +46,8 @@ def get_pred(path):
         if line == '':
             continue
         bbox = line.split(',')
-        x_min, y_min = int(np.min(np.array(bbox[0::2], dtype=np.int))), int(np.min(np.array(bbox[1::2], dtype=np.int)))
-        x_max, y_max = int(np.max(np.array(bbox[0::2], dtype=np.int))), int(np.max(np.array(bbox[1::2], dtype=np.int)))
+        x_min, y_min = int(np.min(np.array(bbox[0::2], dtype=np.int32))), int(np.min(np.array(bbox[1::2], dtype=np.int32)))
+        x_max, y_max = int(np.max(np.array(bbox[0::2], dtype=np.int32))), int(np.max(np.array(bbox[1::2], dtype=np.int32)))
         if len(bbox) % 2 == 1:
             print(path)
         # bbox = [int(x) for x in bbox]
@@ -120,7 +120,7 @@ def iou(det_x, det_y, gt_x, gt_y):
 def process_file(args):
     pred_path, gt_root, th = args
     preds = get_pred(pred_path)
-    gt_path = gt_root + pred_path.split('/')[-1].split('.')[0] + '.txt'
+    gt_path = os.path.join(gt_root, pred_path.split('/')[-1].split('.')[0] + '.txt')
     gts, tags = get_gt(gt_path)
 
     ta = len(preds)
