@@ -63,10 +63,6 @@ config.grad_clip = 25
 # Contour approximation factor
 config.approx_factor = 0.004
 
-# knowledge
-config.know = False
-# config.knownet = "craft"
-config.know_resume = "./model/Test/craft.pth"
 
 
 def update_config(config, extra_config):

@@ -132,7 +132,16 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch, writer):
         if cfg.viz and (i % cfg.viz_freq == 0 and i > 0):
             visualize_network_output(output_dict, input_dict, mode='train')
 
-        pbar.set_postfix({'Training Loss': losses.avg})
+        max_memory = torch.cuda.max_memory_allocated() / 1024 / 1024
+
+        # 각 레이어의 GPU 메모리 사용량 출력
+        # layer_memory = {}
+        # for name, param in model.named_parameters():
+        #     if param.requires_grad:
+        #         layer_memory[name] = param.element_size() * param.nelement() / 1024 / 1024
+        # print(layer_memory)
+        ## 
+        pbar.set_postfix({'Training Loss': f'{losses.avg:.2f}', 'Max Memory': f'{max_memory:.2f} MB'})
         writer.add_scalar('Loss/train', losses.avg, epoch * len(train_loader) + i)
 
         # 메모리 정리
