@@ -103,7 +103,7 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch, writer):
     if accelerator.is_main_process:
         print(f'Epoch: {epoch} : LR = {scheduler.get_lr()}')
 
-    accumulation_steps = 4
+    accumulation_steps = 8
     optimizer.zero_grad()
 
     pbar = tqdm(train_loader, desc=f"Epoch {epoch}")
@@ -112,15 +112,15 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch, writer):
         train_step = 1
         input_dict = _parse_data(inputs)
 
-        # with accelerator.accumulate(accumulation_steps):
-        output_dict = model(input_dict)
-        loss_dict = criterion(input_dict, output_dict, eps=epoch+1)
-        loss = loss_dict["total_loss"]
-        accelerator.backward(loss)
+        with accelerator.accumulate(accumulation_steps):
+            output_dict = model(input_dict)
+            loss_dict = criterion(input_dict, output_dict, eps=epoch+1)
+            loss = loss_dict["total_loss"]
+            accelerator.backward(loss)
 
-        # if (i+1) % accumulation_steps == 0:
-        optimizer.step()
-        optimizer.zero_grad()
+        if (i+1) % accumulation_steps == 0:
+            optimizer.step()
+            optimizer.zero_grad()
 
         torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.grad_clip)
         losses.update(loss.item())

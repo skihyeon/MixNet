@@ -1,2 +1,1 @@
-accelerate launch train.py --exp_name noaug_all \
---lr 1e-3 --batch_size 16 --start_epoch 1 --num_workers 12 --load_memory True --input_size 1024
+accelerate launch train.py --exp_name add_tcm_aug_modified_mid --resume ./model/add_tcm_aug_modified/MixNet_FSNet_H_M_40.pth --lr 1e-4 --batch_size 1 --start_epoch 41 --num_workers 24 --input_size 768 --load_memory True --mid True
