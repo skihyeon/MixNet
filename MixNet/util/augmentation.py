@@ -744,7 +744,7 @@ class Augmentation(object):
             RandomResizedCrop(),
             RotatePadding(up=60, colors=False), 
             ResizeLimitSquare(size=self.size),
-            RandomMirror(),
+            # RandomMirror(),
             RandomDistortion(self._transform_dict),
             # RandomRotation(),
             Normalize(mean=self.mean, std=self.std),

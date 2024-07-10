@@ -26,6 +26,7 @@ from util.augmentation import Augmentation
 # ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
 # accelerator = Accelerator(device_placement=True ,kwargs_handlers=[ddp_kwargs])
 accelerator = Accelerator(device_placement=True)
+# accelerator = Accelerator(device_placement=True, mixed_precision='bf16')
 
 def save_model(model, epoch, lr):
     save_dir = os.path.join(cfg.save_dir, cfg.exp_name)

@@ -94,7 +94,7 @@ class myDataset_mid(TextDataset):
 if __name__ == '__main__':
 
     import time
-    from util.augmentation import BaseTransform
+    from util.augmentation import BaseTransform, Augmentation
     from util import canvas as cav
 
     means = (0.485, 0.456, 0.406)
@@ -105,7 +105,7 @@ if __name__ == '__main__':
     trainset = myDataset_mid(
         data_root='../data/kor_extended',
         is_training=True,
-        transform=transform,
+        transform=Augmentation(size=1024, mean=means, std=stds),
     )
 
 
