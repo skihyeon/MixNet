@@ -13,7 +13,8 @@ class TextLoss(nn.Module):
     def __init__(self, accelerator):
         super().__init__()
         self.MSE_loss = torch.nn.MSELoss(reduce=False, size_average=False)
-        self.BCE_loss = torch.nn.BCELoss(reduce=False, size_average=False)
+        # self.BCE_loss = torch.nn.BCELoss(reduce=False, size_average=False)
+        self.BCE_loss = torch.nn.BCEWithLogitsLoss()
         self.PolyMatchingLoss = PolyMatchingLoss(cfg.num_points, cfg.device, accelerator)
         self.ssim = pytorch_ssim.SSIM()
         self.overlap_loss = overlap_loss()
@@ -216,6 +217,8 @@ class TextLoss(nn.Module):
                                           scale_factor=1/cfg.scale, mode='bilinear').squeeze()
 
         cls_loss = self.BCE_loss(fy_preds[:, 0, :, :],  conf)
+        # self.BCE_loss = torch.nn.BCEWithLogitsLoss()
+        # cls_loss = self.BCE_loss(fy_preds[:, 0, :, :],  conf)
         cls_loss = torch.mul(cls_loss, train_mask).mean()
 
         dis_loss = self.MSE_loss(fy_preds[:, 1, :, :], distance_field)
