@@ -38,7 +38,7 @@ def visualize_network_output(output_dict, input_dict, mode='train'):
 
     b, c, _, _ = fy_preds.shape
     for i in range(b):
-        fig = plt.figure(figsize=(12, 9))
+        fig = plt.figure(figsize=(36, 27))
 
         mask_pred = fy_preds[i, 0, :, :]
         distance_pred = fy_preds[i, 1, :, :]
@@ -96,11 +96,11 @@ def visualize_network_output(output_dict, input_dict, mode='train'):
         for py in py_preds:
             contours = py[index].detach().cpu().numpy()
             image_show = img_show.copy()
-            cv2.drawContours(image_show, init_py.astype(np.int32), -1, (0, 125, 125), 2)
-            cv2.drawContours(image_show, gt_py.astype(np.int32), -1, (255, 125, 0), 2)
-            cv2.drawContours(image_show, contours.astype(np.int32), -1, (0, 255, 125), 2)
-            if cfg.mid == True:
-                cv2.polylines(image_show, midline.astype(np.int32), False, (125, 255, 0), 2)
+            # cv2.drawContours(image_show, init_py.astype(np.int32), -1, (0, 125, 125), 2)  # 초기 폴리곤: 청록색
+            cv2.drawContours(image_show, gt_py.astype(np.int32), -1, (255, 125, 0), 2)    # 실제 폴리곤: 주황색
+            cv2.drawContours(image_show, contours.astype(np.int32), -1, (0, 255, 125), 2) # 예측 폴리곤: 연두색
+            # if cfg.mid == True:
+            #     cv2.polylines(image_show, midline.astype(np.int32), False, (125, 255, 0), 2)
             shows.append(image_show)
 
         for idx, im_show in enumerate(shows):

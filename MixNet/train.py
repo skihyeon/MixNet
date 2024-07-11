@@ -46,31 +46,31 @@ def save_model(model, epoch, lr):
     torch.save(state_dict, save_path)
 
 
-def load_model(model, model_path):
-    if accelerator.is_main_process:
-        print(f"Loading from {model_path}")
-    # state_dict = torch.load(model_path,  map_location=cfg.device)
-    state_dict = torch.load(model_path, map_location=accelerator.device)
-    try:
-        model.load_state_dict(state_dict['model'])
-    except RuntimeError as e:
-        model.load_state_dict(state_dict['model'], strict = False)
-
 # def load_model(model, model_path):
-#     print(f"가중치 파일 로드 중: {model_path}")
+#     if accelerator.is_main_process:
+#         print(f"Loading from {model_path}")
+#     # state_dict = torch.load(model_path,  map_location=cfg.device)
 #     state_dict = torch.load(model_path, map_location=accelerator.device)
+#     try:
+#         model.load_state_dict(state_dict['model'])
+#     except RuntimeError as e:
+#         model.load_state_dict(state_dict['model'], strict = False)
+
+def load_model(model, model_path):
+    print(f"가중치 파일 로드 중: {model_path}")
+    state_dict = torch.load(model_path, map_location=accelerator.device)
     
-#     # 기존 모델의 state_dict와 새 모델의 state_dict 키 비교
-#     model_dict = model.state_dict()
-#     pretrained_dict = {k: v for k, v in state_dict['model'].items() if k in model_dict}
+    # 기존 모델의 state_dict와 새 모델의 state_dict 키 비교
+    model_dict = model.state_dict()
+    pretrained_dict = {k: v for k, v in state_dict['model'].items() if k in model_dict}
     
-#     # 새 모델의 state_dict 업데이트
-#     model_dict.update(pretrained_dict)
+    # 새 모델의 state_dict 업데이트
+    model_dict.update(pretrained_dict)
     
-#     # 수정된 state_dict를 모델에 로드
-#     model.load_state_dict(model_dict, strict=False)
+    # 수정된 state_dict를 모델에 로드
+    model.load_state_dict(model_dict, strict=False)
     
-#     print("기존 가중치 로드 완료. 새로운 레이어는 초기화된 상태로 유지됩니다.")
+    print("기존 가중치 로드 완료. 새로운 레이어는 초기화된 상태로 유지됩니다.")
 
 
 
