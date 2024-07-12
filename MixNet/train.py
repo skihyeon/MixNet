@@ -10,6 +10,7 @@ from accelerate import Accelerator, DistributedDataParallelKwargs
 import gc
 
 from dataset.concat_datasets import AllDataset, AllDataset_mid
+from dataset.my_dataset import myDataset
 from dataset.my_dataset_mid import myDataset_mid
 from network.loss import TextLoss
 from network.textnet import TextNet
@@ -157,25 +158,33 @@ def main():
     global lr
     torch.autograd.set_detect_anomaly(True)
 
+    dataset_params = {
+        "is_training": True,
+        "load_memory": cfg.load_memory
+    }
+
     if not cfg.temp:
-        if not cfg.mid:
-            trainset = AllDataset(config=cfg, custom_data_root="./data/kor_extended", open_data_root="./data/open_datas", is_training=True, load_memory=cfg.load_memory)
-
-        elif cfg.mid:
-            trainset = AllDataset_mid(config=cfg, custom_data_root="./data/kor_extended", open_data_root="./data/open_datas", is_training=True, load_memory=cfg.load_memory)
-
-    elif cfg.temp:
-        trainset = myDataset_mid(data_root="./data/kor_extended",
-                                 is_training=True, 
-                                 load_memory=cfg.load_memory,
-                                 transform=Augmentation(size=cfg.input_size, mean=cfg.means, std=cfg.stds))
-
-    if cfg.server_code == 24:       ## 24 서버 Torch 버전 문제로 인해 Generator 호환 X
-        train_loader = data.DataLoader(trainset, batch_size=cfg.batch_size,
-                                       shuffle=True, num_workers=cfg.num_workers,
-                                       pin_memory=True)
+        dataset_params.update({
+            "config": cfg,
+            "custom_data_root": "./data/kor_extended",
+            "open_data_root": "./data/open_datas"
+        })
+        trainset = AllDataset_mid(**dataset_params) if cfg.mid else AllDataset(**dataset_params)
     else:
-        train_loader = data.DataLoader(trainset, batch_size=cfg.batch_size,
+        dataset_params.update({
+            "data_root": "./data/bnk",
+            "transform": Augmentation(size=cfg.input_size, mean=cfg.means, std=cfg.stds)
+        })
+        trainset = myDataset_mid(**dataset_params) if cfg.mid else myDataset(**dataset_params)
+
+    # depreacted - 24 서버 학습에 사용 X
+
+    # if cfg.server_code == 24:       ## 24 서버 Torch 버전 문제로 인해 Generator 호환 X
+    #     train_loader = data.DataLoader(trainset, batch_size=cfg.batch_size,
+    #                                    shuffle=True, num_workers=cfg.num_workers,
+    #                                    pin_memory=True)
+    
+    train_loader = data.DataLoader(trainset, batch_size=cfg.batch_size,
                                        shuffle=True, num_workers=cfg.num_workers,
                                        pin_memory=True, generator=torch.Generator(device=cfg.device))
     
