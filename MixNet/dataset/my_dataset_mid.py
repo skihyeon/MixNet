@@ -39,11 +39,20 @@ class myDataset_mid(TextDataset):
             data = json.load(f)
 
         polygons = []
-        for field in data['images'][0]['fields']:
-            vertices = field['boundingPoly']['vertices']
-            poly = np.array([[v['x'], v['y']] for v in vertices], dtype=np.int32)
-            label = field['inferText']
-            polygons.append(TextInstance(poly, 'c', label))
+        if getattr(data, 'images', None):
+            for field in data['images'][0]['fields']:
+                vertices = field['boundingPoly']['vertices']
+                poly = np.array([[v['x'], v['y']] for v in vertices], dtype=np.int32)
+                label = field['inferText']
+                polygons.append(TextInstance(poly, 'c', label))
+        elif not getattr(data, 'images', None):
+            for field in data['fields']:
+                vertices = field['boundingPoly']
+                poly = np.array([[v['x'], v['y']] for v in vertices], dtype=np.int32)
+                label = field['text']
+                polygons.append(TextInstance(poly, 'c', label))
+        else:
+            assert False, f"Unknown data format: {gt_path}"
         return polygons
 
     def load_img_gt(self, item):

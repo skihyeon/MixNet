@@ -1,1 +1,1 @@
-accelerate launch train.py --exp_name official_ext_kor --resume ./model/official/MixNet_FSNet_hor_925.pth --lr 1e-5 --batch_size 2 --start_epoch 926 --num_workers 24 --input_size 1024 --load_memory True --mid True --net FSNet_hor --temp True
+accelerate launch train.py --exp_name 240712_bnk_ext --resume ./model/240710_only_kor/MixNet_FSNet_H_M_180.pth --lr 1e-5 --batch_size 2 --start_epoch 181 --num_workers 16 --input_size 1024 --temp True --viz True

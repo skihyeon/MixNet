@@ -39,20 +39,21 @@ class myDataset(TextDataset):
             data = json.load(f)
 
         polygons = []
-        if getattr(data, 'images', None):
+        if 'images' in data and data['images']:
             for field in data['images'][0]['fields']:
                 vertices = field['boundingPoly']['vertices']
                 poly = np.array([[v['x'], v['y']] for v in vertices], dtype=np.int32)
                 label = field['inferText']
                 polygons.append(TextInstance(poly, 'c', label))
-        elif not getattr(data, 'images', None):
+        elif 'fields' in data:
             for field in data['fields']:
                 vertices = field['boundingPoly']
                 poly = np.array([[v['x'], v['y']] for v in vertices], dtype=np.int32)
                 label = field['text']
                 polygons.append(TextInstance(poly, 'c', label))
         else:
-            assert False, f"Unknown data format: {gt_path}"
+            print(f"에러가 난 파일명: {gt_path}")
+            return False
 
         return polygons
     
@@ -115,27 +116,21 @@ class myDataset(TextDataset):
 if __name__ == '__main__':
 
     import time
-    from util.augmentation import BaseTransform
+    from util.augmentation import BaseTransform, Augmentation
     from util import canvas as cav
 
     means = (0.485, 0.456, 0.406)
     stds = (0.229, 0.224, 0.225)
 
-    transform = lambda img, polygons=None: ((img / 255.0 - means) / stds, polygons)
+    transform = Augmentation(
+        size=640, mean=means, std=stds
+    )
 
     trainset = myDataset(
-        data_root='../data/kor_extended',
+        data_root='../data/bnk',
         is_training=True,
         transform=transform,
     )
-
-    # for idx in range(0, len(trainset)):
-    #     t0 = time.time()
-    #     img, train_mask, tr_mask, distance_field, \
-    #     direction_field, weight_matrix, ctrl_points, proposal_points, ignore_tags, _ = trainset[idx]
-    #     print(direction_field, weight_matrix, ctrl_points, proposal_points, ignore_tags)
-    #     if idx == 0:  # 첫 번째 데이터만 확인
-    #         break
 
     for idx in range(0, len(trainset)):
         t0 = time.time()
@@ -149,22 +144,6 @@ if __name__ == '__main__':
 
         img = img.transpose(1, 2, 0)
         img = ((img * stds + means) * 255).astype(np.uint8)
-
-        # distance_map = cav.heatmap(np.array(distance_field * 255 / np.max(distance_field), dtype=np.uint8))
-        # cv2.imshow("distance_map", (distance_map > 0.7).astype(np.uint8))
-        # cv2.waitKey(0)
-
-        # direction_map = cav.heatmap(np.array(direction_field[0] * 255 / np.max(direction_field[0]), dtype=np.uint8))
-        # cv2.imshow("direction_field", direction_map)
-        # cv2.waitKey(0)
-        # #
-        # from util.vis_flux import vis_direction_field
-        # vis_direction_field(direction_field)
-
-        # weight_map = cav.heatmap(np.array(weight_matrix * 255 / np.max(weight_matrix), dtype=np.uint8))
-        # cv2.imshow("weight_matrix", weight_map)
-        # cv2.waitKey(0)
-
 
         boundary_point = ctrl_points[np.where(ignore_tags!=0)[0]]
         for i, bpts in enumerate(boundary_point):

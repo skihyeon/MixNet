@@ -36,40 +36,23 @@ class BaseOptions(object):
         self.parser.add_argument('--mgpu', action='store_true', help='Use multi-gpu to train model')
         self.parser.add_argument('--save_dir', default='./model/', help='Path to save checkpoint models')
         self.parser.add_argument('--vis_dir', default='./vis/', help='Path to save visualization images')
-        # self.parser.add_argument('--log_dir', default='./logs/', help='Path to tensorboard log')
-        # self.parser.add_argument('--loss', default='CrossEntropyLoss', type=str, help='Training Loss')
-        # self.parser.add_argument('--input_channel', default=1, type=int, help='number of input channels' )
-        # self.parser.add_argument('--pretrain', default=False, type=str2bool, help='Pretrained AutoEncoder model')
-        # self.parser.add_argument('--verbose', '-v', default=True, type=str2bool, help='Whether to output debug info')
-        # self.parser.add_argument('--viz', default=True, help='Whether to output debug info')
         self.parser.add_argument('--viz', default=False, type=str2bool, help='Whether to output debug info')
 
         # train opts
         self.parser.add_argument('--max_epoch', default=1000, type=int, help='Max epochs')
         self.parser.add_argument('--lr', '--learning-rate', default=1e-4, type=float, help='initial learning rate')
         self.parser.add_argument('--step_size', default=10, type=int, help='step size for learning rate decay')
-        # self.parser.add_argument('--lr_adjust', default='fix',
-                                #  choices=['fix', 'poly'], type=str, help='Learning Rate Adjust Strategy')
-        # self.parser.add_argument('--stepvalues', default=[], nargs='+', type=int, help='# of iter to change lr')
-        # self.parser.add_argument('--weight_decay', '--wd', default=0., type=float, help='Weight decay for SGD')
-        # self.parser.add_argument('--gamma', default=0.1, type=float, help='Gamma update for SGD lr')
-        # self.parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
         self.parser.add_argument('--batch_size', default=2, type=int, help='Batch size for training')
-        # self.parser.add_argument('--optim', default='Adam', type=str, choices=['SGD', 'Adam'], help='Optimizer')
         self.parser.add_argument('--save_freq', default=5, type=int, help='save weights every # epoch')
-        # self.parser.add_argument('--display_freq', default=10, type=int, help='display training metrics every # iter')
         self.parser.add_argument('--viz_freq', default=50, type=int, help='visualize training process every # iter')
-        # self.parser.add_argument('--log_freq', default=10000, type=int, help='log to tensorboard every # iterations')
-        # self.parser.add_argument('--val_freq', default=100, type=int, help='do validation every # iterations')
 
         # backbone
         self.parser.add_argument('--scale', default=1, type=int, help='prediction on 1/scale feature map')
         self.parser.add_argument('--net', default='FSNet_H_M', type=str,
                                  choices=["FSNet_M", "FSNet_H_M","FSNet_hor"], help='Network architecture')
         self.parser.add_argument('--mid', default=False, type=str2bool, help='midline predict to Transformer')
-        # self.parser.add_argument('--embed', default=False, type=str2bool, help='predict embeding value for training')
         self.parser.add_argument('--know', default=False, type=str2bool, help='Knowledge Distillation')
-        # self.parser.add_argument('--onlybackbone', default=False, type=str2bool, help='skip the Transformer block, only train the FSNet. ')
+        
         # data args
         self.parser.add_argument('--load_memory', default=False, type=str2bool, help='Load data into memory')
         self.parser.add_argument('--rescale', type=float, default=255.0, help='rescale factor')
@@ -86,7 +69,6 @@ class BaseOptions(object):
         self.parser.add_argument('--img_root', default=None,   type=str, help='Path to deploy images')
 
         self.parser.add_argument('--infer_path', default=None, type=str, help='inferene image or folder path')
-        self.parser.add_argument('--server_code', default=141, type=int, help='Server code')
         self.parser.add_argument('--freeze_backbone', default=False, type=str2bool, help='Freeze backbone for transfer learning')
         self.parser.add_argument('--tune_option', default=None, choices=[None, 'finetune_with_totaltext', 'transferlearning_with_customdata'], type=str, help='Tune option for transfer learning')
         self.parser.add_argument('--gpu_num', default='2', type=str, help='GPU number')

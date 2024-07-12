@@ -136,13 +136,6 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch, writer):
 
         max_memory = torch.cuda.max_memory_allocated() / 1024 / 1024
 
-        # 각 레이어의 GPU 메모리 사용량 출력
-        # layer_memory = {}
-        # for name, param in model.named_parameters():
-        #     if param.requires_grad:
-        #         layer_memory[name] = param.element_size() * param.nelement() / 1024 / 1024
-        # print(layer_memory)
-        ## 
         pbar.set_postfix({'Training Loss': f'{losses.avg:.2f}', 'Max Memory': f'{max_memory:.2f} MB'})
         writer.add_scalar('Loss/train', losses.avg, epoch * len(train_loader) + i)
 
@@ -177,19 +170,11 @@ def main():
         })
         trainset = myDataset_mid(**dataset_params) if cfg.mid else myDataset(**dataset_params)
 
-    # depreacted - 24 서버 학습에 사용 X
-
-    # if cfg.server_code == 24:       ## 24 서버 Torch 버전 문제로 인해 Generator 호환 X
-    #     train_loader = data.DataLoader(trainset, batch_size=cfg.batch_size,
-    #                                    shuffle=True, num_workers=cfg.num_workers,
-    #                                    pin_memory=True)
-    
     train_loader = data.DataLoader(trainset, batch_size=cfg.batch_size,
                                        shuffle=True, num_workers=cfg.num_workers,
                                        pin_memory=True, generator=torch.Generator(device=cfg.device))
     
     model = TextNet(backbone=cfg.net, is_training=True, freeze_backbone=cfg.freeze_backbone)
-    # model = model.to(cfg.device)
 
     criterion = TextLoss(accelerator)
     lr = cfg.lr
@@ -231,6 +216,5 @@ if __name__ == "__main__":
     
     if accelerator.is_main_process:
         print_config(cfg)
-
-    # main
+        
     main()
