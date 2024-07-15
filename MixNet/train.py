@@ -21,12 +21,11 @@ from util.visualize import visualize_network_output
 from cfglib.option import BaseOptions
 
 from tqdm.auto import tqdm
-from torch.utils.tensorboard import SummaryWriter
 from util.augmentation import Augmentation
 
 # ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
 # accelerator = Accelerator(device_placement=True ,kwargs_handlers=[ddp_kwargs])
-accelerator = Accelerator(device_placement=True)
+accelerator = Accelerator()
 # accelerator = Accelerator(device_placement=True, mixed_precision='bf16')
 
 def save_model(model, epoch, lr):
@@ -46,34 +45,15 @@ def save_model(model, epoch, lr):
     }
     torch.save(state_dict, save_path)
 
-
-# def load_model(model, model_path):
-#     if accelerator.is_main_process:
-#         print(f"Loading from {model_path}")
-#     # state_dict = torch.load(model_path,  map_location=cfg.device)
-#     state_dict = torch.load(model_path, map_location=accelerator.device)
-#     try:
-#         model.load_state_dict(state_dict['model'])
-#     except RuntimeError as e:
-#         model.load_state_dict(state_dict['model'], strict = False)
-
 def load_model(model, model_path):
-    print(f"가중치 파일 로드 중: {model_path}")
+    print('Loading from {}'.format(model_path))
     state_dict = torch.load(model_path, map_location=accelerator.device)
-    
-    # 기존 모델의 state_dict와 새 모델의 state_dict 키 비교
-    model_dict = model.state_dict()
-    pretrained_dict = {k: v for k, v in state_dict['model'].items() if k in model_dict}
-    
-    # 새 모델의 state_dict 업데이트
-    model_dict.update(pretrained_dict)
-    
-    # 수정된 state_dict를 모델에 로드
-    model.load_state_dict(model_dict, strict=False)
-    
-    print("기존 가중치 로드 완료. 새로운 레이어는 초기화된 상태로 유지됩니다.")
-
-
+    try:
+        model.load_state_dict(state_dict['model'])
+    except RuntimeError as e:
+        print("Missing key in state_dict, try to load with strict = False")
+        model.load_state_dict(state_dict['model'], strict = False)
+        print(e)
 
 def _parse_data(inputs):
     input_dict = {}
@@ -93,7 +73,7 @@ def _parse_data(inputs):
         input_dict['edge_field'] = inputs[10]
     return input_dict
 
-def train(model, train_loader, criterion, scheduler, optimizer, epoch, writer):
+def train(model, train_loader, criterion, scheduler, optimizer, epoch):
     global train_step
 
     losses = AverageMeter()
@@ -108,41 +88,50 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch, writer):
     accumulation_steps = 8
     optimizer.zero_grad()
 
-    pbar = tqdm(train_loader, desc=f"Epoch {epoch}")
-    for i, inputs in enumerate(pbar):
-        data_time.update(time.time() - end)
-        train_step = 1
-        input_dict = _parse_data(inputs)
+    # log 파일 경로 설정
+    log_dir = os.path.join(cfg.save_dir, cfg.exp_name)
+    log_path = os.path.join(log_dir, 'train_log.txt')
+    if not os.path.exists(log_dir):
+        mkdirs(log_dir)
+    
+    with open(log_path, 'a') as log_file:
+        pbar = tqdm(train_loader, desc=f"Epoch {epoch}")
+        for i, inputs in enumerate(pbar):
+            data_time.update(time.time() - end)
+            train_step = 1
+            input_dict = _parse_data(inputs)
 
-        with accelerator.accumulate(accumulation_steps):
-            output_dict = model(input_dict)
-            loss_dict = criterion(input_dict, output_dict, eps=epoch+1)
-            loss = loss_dict["total_loss"]
-            accelerator.backward(loss)
+            with accelerator.accumulate(accumulation_steps):
+                output_dict = model(input_dict)
+                loss_dict = criterion(input_dict, output_dict, eps=epoch+1)
+                loss = loss_dict["total_loss"]
+                accelerator.backward(loss)
 
-        if (i+1) % accumulation_steps == 0:
-            optimizer.step()
-            optimizer.zero_grad()
+            if (i+1) % accumulation_steps == 0:
+                optimizer.step()
+                optimizer.zero_grad()
 
-        torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.grad_clip)
-        losses.update(loss.item())
+            torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.grad_clip)
+            losses.update(loss.item())
 
-        batch_time.update(time.time()-end)
-        end = time.time()
+            batch_time.update(time.time()-end)
+            end = time.time()
 
-        # 학습과정 visualization
-        if cfg.viz and (i % cfg.viz_freq == 0 and i > 0):
-            visualize_network_output(output_dict, input_dict, mode='train')
+            # 학습과정 visualization
+            if cfg.viz and (i % cfg.viz_freq == 0 and i > 0):
+                visualize_network_output(output_dict, input_dict, mode='train')
 
-        max_memory = torch.cuda.max_memory_allocated() / 1024 / 1024
+            max_memory = torch.cuda.max_memory_allocated() / 1024 / 1024
 
-        pbar.set_postfix({'Training Loss': f'{losses.avg:.2f}', 'Max Memory': f'{max_memory:.2f} MB'})
-        writer.add_scalar('Loss/train', losses.avg, epoch * len(train_loader) + i)
+            pbar.set_postfix({'Training Loss': f'{losses.avg:.2f}', 'Max Memory': f'{max_memory:.2f} MB'})
 
-        # 메모리 정리
-        del input_dict, output_dict, loss_dict, loss
-        torch.cuda.empty_cache()
-        gc.collect()
+            # 로그 파일에 학습 정보 저장
+            log_file.write(f'Epoch: {epoch}, Step: {i}, Loss: {losses.avg:.2f}, Max Memory: {max_memory:.2f} MB\n')
+
+            # 메모리 정리
+            del input_dict, output_dict, loss_dict, loss
+            torch.cuda.empty_cache()
+            gc.collect()
 
     if epoch % cfg.save_freq == 0:
         save_model(model, epoch, scheduler.get_lr())
@@ -176,6 +165,9 @@ def main():
     
     model = TextNet(backbone=cfg.net, is_training=True, freeze_backbone=cfg.freeze_backbone)
 
+    if cfg.resume:
+        load_model(model, cfg.resume)
+        
     criterion = TextLoss(accelerator)
     lr = cfg.lr
 
@@ -184,22 +176,15 @@ def main():
     scheduler = lr_scheduler.StepLR(optimizer, step_size=cfg.step_size, gamma=0.9)
 
     model, optimizer, train_loader, criterion = accelerator.prepare(model, optimizer, train_loader, criterion)
-    writer = SummaryWriter(log_dir=os.path.join(cfg.save_dir, cfg.exp_name, 'logs'))
 
     if cfg.cuda:
         cudnn.benchmark = True
-    if cfg.resume:
-        load_model(model, cfg.resume)
-    if cfg.freeze_backbone and not cfg.resume:
-        assert "Freeze backbone is only available when resume is True"
-
     if accelerator.is_main_process:
         print('Start training MixNet.')
     for epoch in range(cfg.start_epoch, cfg.max_epoch+1):
         scheduler.step()
-        train(model, train_loader, criterion, scheduler, optimizer, epoch, writer)
+        train(model, train_loader, criterion, scheduler, optimizer, epoch)
 
-    writer.close()
     print('End.')
 
     if torch.cuda.is_available():
@@ -216,5 +201,10 @@ if __name__ == "__main__":
     
     if accelerator.is_main_process:
         print_config(cfg)
+        log_dir = os.path.join(cfg.save_dir, cfg.exp_name)
+        os.makedirs(log_dir, exist_ok=True)
+        with open(os.path.join(log_dir, 'config.txt'), 'w') as f:
+            for key, value in vars(cfg).items():
+                f.write(f'{key}: {value}\n')
         
     main()
