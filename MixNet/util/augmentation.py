@@ -633,7 +633,7 @@ class ResizeSquare(object):
 
         new_h = int(int(h * im_scale/32)*32)
         new_w = int(int(w * im_scale/32)*32)
-
+        print(new_h, new_w)
         image = cv2.resize(image, (new_w, new_h))
         scales = np.array([new_w / w, new_h / h])
         if polygons is not None:

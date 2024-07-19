@@ -6,8 +6,8 @@ import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
 import torch.utils.data as data
-from dataset.concat_datasets import AllDataset
-from dataset.my_dataset import myDataset
+from dataset.concat_datasets import AllDataset, AllDataset_mid
+from dataset.my_dataset import myDataset, myDataset_mid
 from network.textnet import TextNet
 from cfglib.config import config as cfg, update_config
 
@@ -109,19 +109,29 @@ def inference(model, test_loader, output_dir):
 
 
 def main(vis_dir_path):
-    if cfg.eval_dataset == 'All': 
-        testset = AllDataset(config=cfg, 
-                             custom_data_root="./data/kor_extended", 
-                             open_data_root="./data/open_datas", 
-                             is_training=False, 
-                             load_memory=cfg.load_memory)
-    elif cfg.eval_dataset == 'my':
-        testset = myDataset(
-            data_root = './data/kor_extended',
-            is_training=False,
-            load_memory=cfg.load_memory,
-            transform=BaseTransform(size=cfg.test_size, mean=cfg.means, std=cfg.stds)
-        )
+    dataset_params = {
+        "is_training": True,
+        "load_memory": cfg.load_memory
+    }
+
+    if not cfg.temp:
+        dataset_params.update({
+            "config": cfg,
+            "custom_data_root": "./data/kor_extended",
+            "open_data_root": "./data/open_datas"
+        })
+        testset = AllDataset_mid(**dataset_params) if cfg.mid else AllDataset(**dataset_params)
+    else:
+        dataset_params.update({
+            "data_root": "./data/bnk",
+            "transform": BaseTransform(size=cfg.input_size, mean=cfg.means, std=cfg.stds)
+        })
+        testset = myDataset_mid(**dataset_params) if cfg.mid else myDataset(**dataset_params)
+
+    test_loader = data.DataLoader(testset, batch_size=cfg.batch_size,
+                                       shuffle=True, num_workers=cfg.num_workers,
+                                       pin_memory=True, generator=torch.Generator(device=cfg.device))
+    
     torch.cuda.set_device(cfg.device)
     cudnn.benchmark = False
     test_loader = data.DataLoader(testset, batch_size=1, shuffle=False, num_workers=cfg.num_workers)
