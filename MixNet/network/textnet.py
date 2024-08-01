@@ -32,7 +32,7 @@ class Evolution(nn.Module):
                 m.weight.data.normal_(0.0, 0.02)
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)
-
+    
     @staticmethod
     def get_boundary_proposal(input=None, seg_preds=None, switch="gt"):
         if switch == "gt":
@@ -146,7 +146,7 @@ class TextNet(nn.Module):
             self.BPN = midlinePredictor(seg_channel=32+4, is_training=is_training)
         else:
             self.BPN = Evolution(cfg.num_points, seg_channel=32+4, is_training=is_training, device=cfg.device)
-
+        print(f"Total MixNet parameter size: ", count_parameters(self))
     def load_model(self, model_path):
         print('Loading from {}'.format(model_path))
         state_dict = torch.load(model_path, map_location=torch.device(cfg.device))
@@ -163,13 +163,11 @@ class TextNet(nn.Module):
             image[:, :, :h, :w] = input_dict["img"][:, :, :, :]
 
         up1 = self.fpn(image)
-        # up1 = torch.utils.checkpoint.checkpoint(self.fpn, image) ## 이건 문제 없음
         if cfg.know or knowledge:
             output["image_feature"] = up1
         if knowledge:
             return output
         preds = self.seg_head(up1)
-        # preds = torch.utils.checkpoint.checkpoint(self.seg_head, up1) ## 여기도 문제 없음
 
         fy_preds = torch.cat([torch.sigmoid(preds[:, 0:2, :, :]), preds[:, 2:4, :, :]], dim=1)
 
@@ -177,10 +175,8 @@ class TextNet(nn.Module):
 
         if cfg.mid:
             py_preds, inds, confidences, midline = self.BPN(cnn_feats, input=input_dict, seg_preds=fy_preds, switch="gt")
-            # py_preds, inds, confidences, midline = torch.utils.checkpoint.checkpoint(self.BPN, cnn_feats, input_dict, fy_preds, "gt") ## 이게 문제임.
         else:
             py_preds, inds, confidences = self.BPN(cnn_feats, input=input_dict, seg_preds=fy_preds, switch="gt")
-            # py_preds, inds, confidences, midline = torch.utils.checkpoint.checkpoint(self.BPN, cnn_feats, input_dict, fy_preds, "gt")
         
         output["fy_preds"] = fy_preds
         output["py_preds"] = py_preds
@@ -190,3 +186,70 @@ class TextNet(nn.Module):
             output["midline"] = midline
             
         return output
+
+import time
+## try to excute "python -m network.textnet"
+# If you want excute this, please change line 179, switch="gt" to switch="else"
+if __name__ == "__main__":
+    import torch.optim as optim
+
+    def test_model_training(model, input_size=(1, 3, 224, 224), iterations=100):
+        model.train()  # 모델을 학습 모드로 설정
+        optimizer = optim.Adam(model.parameters(), lr=0.001)
+        criterion = nn.MSELoss()  # 예시로 MSE 손실 함수 사용
+
+        input_tensor = torch.randn(input_size).to(cfg.device)
+        input_dict = {
+            "img": input_tensor,
+            "train_mask": torch.randn(input_size).to(cfg.device),
+            "tr_mask": torch.randn(input_size).to(cfg.device),
+            "distance_field": torch.randn(input_size).to(cfg.device),
+            "direction_field": torch.randn(input_size).to(cfg.device),
+            "weight_matrix": torch.randn(input_size).to(cfg.device),
+            "gt_points": torch.randn((1, 100, 2)).to(cfg.device),  # 예시 크기
+            "proposal_points": torch.randn((1, 100, 2)).to(cfg.device),  # 예시 크기
+            "ignore_tags": torch.randn((1, 100)).to(cfg.device),  # 예시 크기
+            "edge_field": torch.randn(input_size).to(cfg.device)
+        }
+
+        # 워밍업
+        for _ in range(10):
+            optimizer.zero_grad()
+            output = model(input_dict)
+            loss = criterion(output["py_preds"][-1], input_dict["gt_points"])
+            loss.backward()
+            optimizer.step()
+
+        torch.cuda.reset_peak_memory_stats()  # 메모리 통계 초기화
+        torch.cuda.synchronize()
+        start_time = time.time()
+        for _ in range(iterations):
+            optimizer.zero_grad()
+            output = model(input_dict)
+            loss = criterion(output["py_preds"][-1], input_dict["gt_points"])
+            loss.backward()
+            optimizer.step()
+        torch.cuda.synchronize()
+        end_time = time.time()
+
+        max_memory = torch.cuda.max_memory_allocated() / (1024 * 1024)  # MB 단위로 변환
+
+        return (end_time - start_time) / iterations, max_memory
+
+    # 기본 모델
+    model_base = TextNet(backbone='FSNet_M', is_training=True, freeze_backbone=False)
+    model_base.to(cfg.device)
+    time_base, memory_base = test_model_training(model_base)
+    print(f"기본 모델 평균 학습 시간: {time_base:.5f}초, 최대 메모리 사용량: {memory_base:.2f} MB")
+
+    # 파라미터 증가 모델
+    model_param = TextNet(backbone='FSNet_M', is_training=True, freeze_backbone=False)
+    for i in range(model_param.BPN.iter):
+        evolve_gcn = Transformer(36, 256, num_heads=16, dim_feedforward=2048, drop_rate=0.0, if_resi=True, block_nums=6)
+        model_param.BPN.__setattr__('evolve_gcn' + str(i), evolve_gcn)
+    model_param.to(cfg.device)
+    time_param, memory_param = test_model_training(model_param)
+    print(f"파라미터 증가 모델 평균 학습 시간: {time_param:.5f}초, 최대 메모리 사용량: {memory_param:.2f} MB")
+
+    print(f"파라미터 증가로 인한 학습 시간 증가: {(time_param - time_base) / time_base * 100:.2f}%")
+    print(f"파라미터 증가로 인한 메모리 사용량 증가: {(memory_param - memory_base) / memory_base * 100:.2f}%")

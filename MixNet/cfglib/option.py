@@ -73,7 +73,11 @@ class BaseOptions(object):
         self.parser.add_argument('--gpu_num', default='2', type=str, help='GPU number')
         self.parser.add_argument('--eval_dataset', default=None, choices=['All', 'my'],type=str, help='Eval dataset')
         self.parser.add_argument('--num_points', default=20, type=int, help ='sampling points')
-        self.parser.add_argument('--temp', default=False, type=str2bool, help='temp')
+        # self.parser.add_argument('--temp', default=False, type=str2bool, help='temp')
+        self.parser.add_argument('--custom_data_root', default="data/custom_datas", type=str, help='custom data root')
+        self.parser.add_argument('--open_data_root', default="data/open_datas", type=str, help='open data root')
+        self.parser.add_argument('--select_open_data', default="totaltext,MSRA-TD500,ctw1500,FUNSD,XFUND,SROIE2019", type=str, help='select open data')
+        self.parser.add_argument('--select_custom_data', default="kor_extended,bnk", type=str, help='select custom data')
     def parse(self, fixed=None):
 
         if fixed is not None:

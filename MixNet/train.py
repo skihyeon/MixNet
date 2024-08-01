@@ -140,25 +140,13 @@ def main():
     global lr
     torch.autograd.set_detect_anomaly(True)
 
+    cfg.is_training = True
+    cfg.load_memory = False
     dataset_params = {
-        "is_training": True,
-        "load_memory": cfg.load_memory
+        "config": cfg
     }
 
-    if not cfg.temp:
-        dataset_params.update({
-            "config": cfg,
-            "custom_data_root": "./data/kor_extended",
-            "open_data_root": "./data/open_datas"
-        })
-        trainset = AllDataset_mid(**dataset_params) if cfg.mid else AllDataset(**dataset_params)
-    else:
-        dataset_params.update({
-            "data_root": "./data/bnk",
-            "transform": Augmentation(size=cfg.input_size, mean=cfg.means, std=cfg.stds)
-        })
-        trainset = myDataset_mid(**dataset_params) if cfg.mid else myDataset(**dataset_params)
-
+    trainset = AllDataset_mid(**dataset_params) if cfg.mid else AllDataset(**dataset_params)
     train_loader = data.DataLoader(trainset, batch_size=cfg.batch_size,
                                        shuffle=True, num_workers=cfg.num_workers,
                                        pin_memory=True, generator=torch.Generator(device=cfg.device))

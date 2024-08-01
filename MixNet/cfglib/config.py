@@ -56,15 +56,18 @@ config.scale = 1
 config.grad_clip = 25
 
 # demo tcl threshold
-# config.dis_threshold = 0.3
+config.dis_threshold = 0.3
 #
-# config.cls_threshold = 0.8
+config.cls_threshold = 0.8
 
 # Contour approximation factor
 config.approx_factor = 0.004
 
-
-
+config.resume=False
+config.mid = False
+config.device = torch.device('cuda:0') if config.cuda else torch.device('cpu')
+config.know = False
+config.threshold = 0.1
 def update_config(config, extra_config):
     for k, v in vars(extra_config).items():
         config[k] = v
