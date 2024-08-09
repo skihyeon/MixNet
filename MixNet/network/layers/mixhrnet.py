@@ -69,9 +69,9 @@ def switchLayer(channels, xs):
 
 #     return outputs
 
-class FSNet(nn.Module):
+class mixHRnet(nn.Module):
     def __init__(self, channels = 64, numofblocks = 4, layers = [1,2,3,4], dcn = False):
-        super(FSNet, self).__init__()
+        super(mixHRnet, self).__init__()
         self.channels = channels
         self.numofblocks = numofblocks
         self.layers = layers
@@ -131,42 +131,33 @@ class FSNet(nn.Module):
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
-# def FSNet_M(pretrained = True):
-#     model = FSNet()
-#     print("MixNet backbone parameter size: ", count_parameters(model))
-#     if pretrained:
-#         load_path = "./model/240805_pretrain_backbone/MixNet_FSNet_M_20.pth"
-#         cpt = torch.load(load_path)
-        
-#         # 키 이름에서 'fpn.backbone.' 접두사 제거
-#         new_state_dict = {k.replace('fpn.backbone.', ''): v for k, v in cpt['model'].items()}
-#         model.load_state_dict(new_state_dict, strict=True)
-#         print("load pretrain weight from {}. ".format(load_path))
-#         # print("mixHRnet does not have pretrained weight yet. ")
-#     return model
-
-
-def FSNet_M(pretrained = True):
-    model = FSNet()
-    print("MixNet backbone parameter size: ", count_parameters(model))
+def mixTriHRnet(pretrained = True):
+    model = mixHRnet()
+    print("mixNet parameter size: ", count_parameters(model))
     if pretrained:
-        # load_path = "./model/240805_pretrain_backbone/MixNet_FSNet_M_20.pth"
-        # cpt = torch.load(load_path)
-        
-        # # FSNet에 해당하는 키만 선택
-        # new_state_dict = {}
-        # for k, v in cpt['model'].items():
-        #     if k.startswith('fpn.backbone.'):
-        #         new_key = k.replace('fpn.backbone.', '')
-        #         if new_key in model.state_dict():
-        #             new_state_dict[new_key] = v
-        
-        # # 수정된 state_dict로 모델 로드
-        # model.load_state_dict(new_state_dict, strict=False)
-        # print("load pretrain weight from {}. ".format(load_path))
-        # print("Loaded keys:", len(new_state_dict))
-        # print("Total model keys:", len(model.state_dict()))
-        print("No pretrained weight")
-    else:
-        print("pretraine execute")
+        load_path = "./pretrained/triHRnet_Synth_weight.pth"
+        cpt = torch.load(load_path)
+        model.load_state_dict(cpt, strict=True)
+        print("load pretrain weight from {}. ".format(load_path))
+        # print("mixHRnet does not have pretrained weight yet. ")
     return model
+
+def lightmixTriHRnet(pretrained = True):
+    model = mixHRnet(channels = 64, numofblocks=2)
+    print("lightmixNet parameter size: ", count_parameters(model))
+    if pretrained:
+        load_path = "./pretrained/lightmixHRnet_Synth.pth"
+        cpt = torch.load(load_path)
+        model.load_state_dict(cpt, strict=True)
+        print("load pretrain weight from {}. ".format(load_path))
+        # print("lightmixHRnet does not have pretrained weight yet. ")
+    return model
+
+if "__main__" == __name__:
+    img = torch.rand((4,3,640,640))
+    model = mixHRnet()
+    x1,x2,x3,x4 = model(img)
+    print(x1.shape)
+    print(x2.shape)
+    print(x3.shape)
+    print(x4.shape)

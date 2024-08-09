@@ -5,7 +5,7 @@ import torch
 import torch.backends.cudnn as cudnn
 import multiprocessing
 
-from dataset import myDataset
+from dataset import myDataset, myDataset_mid
 from dataset.dataload import pil_load_img, TextDataset
 from network.textnet import TextNet
 from cfglib.config import config as cfg, update_config
@@ -62,7 +62,8 @@ class myDataset(TextDataset):
 
 def inference(model, image_path, output_dir):
 
-    torch.cuda.set_device(cfg.device)
+    torch.cuda.set_device(torch.cuda.current_device())
+
     dataset = myDataset(image_path=image_path,transform=BaseTransform(size=cfg.test_size, mean=cfg.means, std=cfg.stds))
     data = dataset[0]
     image, meta = data
@@ -72,7 +73,7 @@ def inference(model, image_path, output_dir):
 
     input_dict['img'] = torch.tensor(image[np.newaxis, :]).to(cfg.device)
     with torch.no_grad():
-        output_dict = model(input_dict)
+        output_dict = model(input_dict, test_speed=True)
     
     # print(f'{image_path} processing...', end='\r', flush=True)
     img_show = image.transpose(1, 2, 0)

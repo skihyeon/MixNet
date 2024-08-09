@@ -21,8 +21,10 @@ class Evolution(nn.Module):
         self.clip_dis = 100
 
         self.iter = 3
+        # self.iter = 6
         for i in range(self.iter):
             evolve_gcn = Transformer(seg_channel, 128, num_heads=8, dim_feedforward=1024, drop_rate=0.0, if_resi=True, block_nums=3)
+            # evolve_gcn = Transformer(seg_channel, 192, num_heads=12, dim_feedforward=1536, drop_rate=0.1, if_resi=True, block_nums=4)
             self.__setattr__('evolve_gcn' + str(i), evolve_gcn)
         if not is_training:
             self.iter = 1
@@ -32,6 +34,9 @@ class Evolution(nn.Module):
                 m.weight.data.normal_(0.0, 0.02)
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)
+
+            for param in m.parameters():
+                param.requires_grad = True
     
     @staticmethod
     def get_boundary_proposal(input=None, seg_preds=None, switch="gt"):
@@ -116,6 +121,13 @@ class Evolution(nn.Module):
             init_polys = self.evolve_poly(evolve_gcn, embed_feature, init_polys, inds[0])
             py_preds.append(init_polys)
 
+            # if self.is_training and evolve_gcn.parameters() is not None:
+            #     for name, param in evolve_gcn.named_parameters():
+            #         if param.grad is not None:
+            #             print(f"evolve_gcn{i} {name} grad norm: {param.grad.norm().item()}")
+            #         else:
+            #             print(f"evolve_gcn{i} {name} has no grad")
+
         return py_preds, inds, confidences
     
 def count_parameters(model):
@@ -123,16 +135,11 @@ def count_parameters(model):
 
 
 class TextNet(nn.Module):
-    def __init__(self, backbone='vgg', is_training=True, freeze_backbone=False):
+    def __init__(self, backbone='vgg', is_training=True):
         super().__init__()
         self.is_training = is_training
         self.backbone_name = backbone
-        self.fpn = FPN(self.backbone_name, is_training=(not cfg.resume and is_training))
-        print(f"MixNet with {self.backbone_name} parameter size: ", count_parameters(self.fpn))
-        
-        if freeze_backbone:
-            for param in self.fpn.parameters():
-                param.requires_grad = False
+        self.fpn = FPN(self.backbone_name, is_training=(not cfg.resume and is_training and not cfg.onlybackbone))
 
         self.seg_head = nn.Sequential(
             nn.Conv2d(32, 16, kernel_size=3, padding=2, dilation=2),
@@ -142,20 +149,35 @@ class TextNet(nn.Module):
             nn.Conv2d(16, 4, kernel_size=1, stride=1, padding=0),
         )
 
-        if cfg.mid:
-            self.BPN = midlinePredictor(seg_channel=32+4, is_training=is_training)
-        else:
-            self.BPN = Evolution(cfg.num_points, seg_channel=32+4, is_training=is_training, device=cfg.device)
-        print(f"Total MixNet parameter size: ", count_parameters(self))
+        if cfg.embed:
+            self.embed_head = nn.Sequential(
+                nn.Conv2d(32, 16, kernel_size=3, padding=2, dilation=2),
+                nn.PReLU(),
+                nn.Conv2d(16, 16, kernel_size=3, padding=4, dilation=4),
+                nn.PReLU(),
+                nn.Conv2d(16, 4, kernel_size=1, stride=1, padding=0),
+                nn.Conv2d(4, 2, kernel_size=1, stride=1, padding=0),
+            )
+            # self.embed_head = nn.Conv2d(32, 1, kernel_size=1, stride=1, padding=0),
+        if not cfg.onlybackbone:
+            if cfg.mid:
+                self.BPN = midlinePredictor(seg_channel=32+4, is_training=is_training)
+            elif cfg.embed:
+                self.BPN = Evolution(cfg.num_points, seg_channel=32+4+2, is_training=is_training, device=cfg.device)
+            else:
+                self.BPN = Evolution(cfg.num_points, seg_channel=32+4, is_training=is_training, device=cfg.device)
+
+        print(f"Total MixNet with {self.backbone_name} parameter size: ", count_parameters(self))
+
     def load_model(self, model_path):
         print('Loading from {}'.format(model_path))
         state_dict = torch.load(model_path, map_location=torch.device(cfg.device))
         self.load_state_dict(state_dict['model'], strict=(not self.is_training))
-    
+
     def forward(self, input_dict, test_speed=False, knowledge = False):
         output = {}
         b, c, h, w = input_dict["img"].shape
-
+        # print(b,c,h,w)
         if self.is_training or test_speed:
             image = input_dict["img"]
         else:
@@ -170,8 +192,17 @@ class TextNet(nn.Module):
         preds = self.seg_head(up1)
 
         fy_preds = torch.cat([torch.sigmoid(preds[:, 0:2, :, :]), preds[:, 2:4, :, :]], dim=1)
+        # fy_preds = torch.cat([preds[:, 0:2, :, :], preds[:, 2:4, :, :]], dim=1)
+        if cfg.onlybackbone:
+            output["fy_preds"] = fy_preds
+            return output
 
         cnn_feats = torch.cat([up1, fy_preds], dim=1)
+        if cfg.embed: #or cfg.mid:
+            embed_feature = self.embed_head(up1)
+            # embed_feature = self.overlap_head(up1)
+            # if not self.training:
+                # andpart = embed_feature[0][0] * embed_feature[0][1]
 
         if cfg.mid:
             py_preds, inds, confidences, midline = self.BPN(cnn_feats, input=input_dict, seg_preds=fy_preds, switch="gt")
@@ -184,12 +215,15 @@ class TextNet(nn.Module):
         output["confidences"] = confidences
         if cfg.mid:
             output["midline"] = midline
-            
+        if cfg.embed : # or cfg.mid:
+            output["embed"] = embed_feature
+
+        # print(py_preds)
         return output
 
 import time
 ## try to excute "python -m network.textnet"
-# If you want excute this, please change line 179, switch="gt" to switch="else"
+# If you want excute this, please change line 200, switch="gt" to switch="else"
 if __name__ == "__main__":
     import torch.optim as optim
 
@@ -237,13 +271,13 @@ if __name__ == "__main__":
         return (end_time - start_time) / iterations, max_memory
 
     # 기본 모델
-    model_base = TextNet(backbone='FSNet_M', is_training=True, freeze_backbone=False)
+    model_base = TextNet(backbone='FSNet_M', is_training=True)
     model_base.to(cfg.device)
     time_base, memory_base = test_model_training(model_base)
     print(f"기본 모델 평균 학습 시간: {time_base:.5f}초, 최대 메모리 사용량: {memory_base:.2f} MB")
 
     # 파라미터 증가 모델
-    model_param = TextNet(backbone='FSNet_M', is_training=True, freeze_backbone=False)
+    model_param = TextNet(backbone='FSNet_M', is_training=True)
     for i in range(model_param.BPN.iter):
         evolve_gcn = Transformer(36, 256, num_heads=16, dim_feedforward=2048, drop_rate=0.0, if_resi=True, block_nums=6)
         model_param.BPN.__setattr__('evolve_gcn' + str(i), evolve_gcn)

@@ -39,21 +39,33 @@ class myDataset_mid(TextDataset):
             data = json.load(f)
 
         polygons = []
-        if getattr(data, 'images', None):
+        if 'images' in data and data['images']:
             for field in data['images'][0]['fields']:
                 vertices = field['boundingPoly']['vertices']
                 poly = np.array([[v['x'], v['y']] for v in vertices], dtype=np.int32)
                 label = field['inferText']
                 polygons.append(TextInstance(poly, 'c', label))
-        elif not getattr(data, 'images', None):
+        elif 'fields' in data:
             for field in data['fields']:
                 vertices = field['boundingPoly']
                 poly = np.array([[v['x'], v['y']] for v in vertices], dtype=np.int32)
                 label = field['text']
                 polygons.append(TextInstance(poly, 'c', label))
         else:
-            assert False, f"Unknown data format: {gt_path}"
+            print(f"에러가 난 파일명: {gt_path}")
+            return False
+
         return polygons
+    
+    def make_txt(self, gt_path, polygons):
+        txt_path = gt_path.replace('.json', '').replace('.jpg', '').replace('.jpeg', '').replace('.png', '').replace('.PNG', '').replace('.JPG', '').replace('JPEG', '') + '.txt'
+        if not os.path.exists(txt_path):
+            with open(txt_path, 'w', encoding='utf-8') as f:
+                for poly in polygons:
+                    points = poly.points.flatten()
+                    points_str = ','.join(map(str, points))
+                    f.write(f"{points_str},{poly.label}\n")
+
 
     def load_img_gt(self, item):
         image_path = os.path.join(self.image_root, self.image_list[item])
@@ -72,6 +84,7 @@ class myDataset_mid(TextDataset):
 
         annotation_path = self.annotation_list[item]
         polygons = self.parse_json(annotation_path)
+        self.make_txt(annotation_path, polygons)
 
         data = dict()
         data["image"] = image
@@ -96,7 +109,6 @@ class myDataset_mid(TextDataset):
 
     def __len__(self):
         return len(self.image_list)
-    
 
 
 

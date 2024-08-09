@@ -38,7 +38,7 @@ def visualize_network_output(output_dict, input_dict, mode='train'):
 
     b, c, _, _ = fy_preds.shape
     for i in range(b):
-        fig = plt.figure(figsize=(36, 27))
+        fig = plt.figure(figsize=(48, 36))
 
         mask_pred = fy_preds[i, 0, :, :]
         distance_pred = fy_preds[i, 1, :, :]
@@ -104,7 +104,7 @@ def visualize_network_output(output_dict, input_dict, mode='train'):
             shows.append(image_show)
 
         for idx, im_show in enumerate(shows):
-            axb = fig.add_subplot(3, 4, 9+idx)
+            axb = fig.add_subplot(3, 5, 9+idx)
             im11 = axb.imshow(im_show, cmap=cm.jet)
 
         path = os.path.join(vis_dir, '{}.png'.format(i))
@@ -192,4 +192,25 @@ def visualize_detection(image, output_dict, meta=None, infer=None):
     heat_map = np.concatenate([cls_pred*255, dis_pred*255], axis=1)
     # heat_map = cv2.resize(heat_map, (320 * 2, 320))
 
+    return show_boundary, heat_map
+
+
+
+def visualize_detection_backbone(image, output_dict, meta=None, infer=None):
+    image_show = image.copy()
+    image_show = np.ascontiguousarray(image_show[:, :, ::-1])
+
+    cls_preds = F.interpolate(output_dict["fy_preds"], scale_factor=cfg.scale, mode='bilinear')
+    cls_preds = cls_preds[0].data.cpu().numpy()
+
+    im_show0 = image_show.copy()
+
+    show_boundary = im_show0
+
+    cls_pred = cav.heatmap(np.array(cls_preds[0] * 255, dtype=np.uint8))
+    dis_pred = cav.heatmap(np.array(cls_preds[1] * 255, dtype=np.uint8))
+
+    heat_map = np.concatenate([cls_pred*255, dis_pred*255], axis=1)
+    heat_map = cv2.resize(heat_map, (320 * 2, 320))
+    show_boundary = cv2.resize(show_boundary, (320 , 320))
     return show_boundary, heat_map

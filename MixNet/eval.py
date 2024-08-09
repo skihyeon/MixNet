@@ -7,7 +7,6 @@ import torch
 import torch.backends.cudnn as cudnn
 import torch.utils.data as data
 from dataset.concat_datasets import AllDataset, AllDataset_mid
-from dataset.my_dataset import myDataset, myDataset_mid
 from network.textnet import TextNet
 from cfglib.config import config as cfg, update_config
 
@@ -109,24 +108,13 @@ def inference(model, test_loader, output_dir):
 
 
 def main(vis_dir_path):
+
     dataset_params = {
-        "is_training": True,
-        "load_memory": cfg.load_memory
+        "config": cfg,
+        "is_training" : False
     }
 
-    if not cfg.temp:
-        dataset_params.update({
-            "config": cfg,
-            "custom_data_root": "./data/kor_extended",
-            "open_data_root": "./data/open_datas"
-        })
-        testset = AllDataset_mid(**dataset_params) if cfg.mid else AllDataset(**dataset_params)
-    else:
-        dataset_params.update({
-            "data_root": "./data/bnk",
-            "transform": BaseTransform(size=cfg.input_size, mean=cfg.means, std=cfg.stds)
-        })
-        testset = myDataset_mid(**dataset_params) if cfg.mid else myDataset(**dataset_params)
+    testset = AllDataset_mid(**dataset_params) if cfg.mid else AllDataset(**dataset_params)
 
     test_loader = data.DataLoader(testset, batch_size=cfg.batch_size,
                                        shuffle=True, num_workers=cfg.num_workers,

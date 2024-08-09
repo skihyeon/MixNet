@@ -80,7 +80,7 @@ class FPN(nn.Module):
         self.hor_block = False
 
         if backbone in ["FSNet_hor"]:
-            self.backbone = FSNet_M()
+            self.backbone = FSNet_M(pretrained=is_training)
             out_channels = self.backbone.channels * 4
             self.hor_block = True
             self.hors = nn.ModuleList()
@@ -90,15 +90,21 @@ class FPN(nn.Module):
             self.reduceLayer = reduceBlock(out_channels*4,32, up = True)
             self.skipfpn = True
 
+        elif backbone in ["FSNet_S"]:
+            self.backbone = FSNet_S(pretrained=is_training)
+            out_channels = self.backbone.channels * 4
+            self.upc1 = nn.ConvTranspose2d(32, 32, kernel_size=4, stride=2, padding=1)
+            self.reduceLayer = reduceBlock(out_channels*4,32, up = True)
+
         elif backbone in ["FSNet_M"]:
-            self.backbone = FSNet_M()
+            self.backbone = FSNet_M(pretrained=is_training)
             out_channels = self.backbone.channels * 4
             self.upc1 = nn.ConvTranspose2d(32, 32, kernel_size=4, stride=2, padding=1)
             self.reduceLayer = reduceBlock(out_channels*4,32, up = True)
             self.cbam_block = True
 
         elif backbone in ["FSNet_H_M"]:
-            self.backbone = FSNet_M()
+            self.backbone = FSNet_M(pretrained=is_training)
             out_channels = self.backbone.channels * 4
             self.hor_block = True
             self.hors = nn.ModuleList()
@@ -144,5 +150,3 @@ class FPN(nn.Module):
         del c4
         del c5
         return c1 
-
-

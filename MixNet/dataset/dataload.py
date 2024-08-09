@@ -114,6 +114,7 @@ class TextDataset(object):
     def compute_direction_field(inst_mask, h, w):
         _, labels = cv2.distanceTransformWithLabels(inst_mask, cv2.DIST_L2,
                                                     cv2.DIST_MASK_PRECISE, labelType=cv2.DIST_LABEL_PIXEL)
+        
         # # compute the direction field
         index = np.copy(labels)
         index[inst_mask > 0] = 0

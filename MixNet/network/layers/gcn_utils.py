@@ -1,8 +1,12 @@
+# -*- coding: utf-8 -*-
+__author__ = "S.X.Zhang"
 import torch
 import numpy as np
 import cv2
 import torch.nn as nn
 from torch.autograd import Variable
+
+from numpy import pi
 
 
 def normalize_adj(A, type="AD"):
@@ -140,4 +144,9 @@ def img_poly_to_can_poly(img_poly):
     can_poly = img_poly.clone()
     can_poly[..., 0] = can_poly[..., 0] - x_min[..., None]
     can_poly[..., 1] = can_poly[..., 1] - y_min[..., None]
+    # x_max = torch.max(img_poly[..., 0], dim=-1)[0]
+    # y_max = torch.max(img_poly[..., 1], dim=-1)[0]
+    # h, w = y_max - y_min + 1, x_max - x_min + 1
+    # long_side = torch.max(h, w)
+    # can_poly = can_poly / long_side[..., None, None]
     return can_poly

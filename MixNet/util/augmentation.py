@@ -633,7 +633,6 @@ class ResizeSquare(object):
 
         new_h = int(int(h * im_scale/32)*32)
         new_w = int(int(w * im_scale/32)*32)
-        print(new_h, new_w)
         image = cv2.resize(image, (new_w, new_h))
         scales = np.array([new_w / w, new_h / h])
         if polygons is not None:
@@ -740,11 +739,11 @@ class Augmentation(object):
         self._transform_dict = {'brightness': 0.3, 'contrast': 0.3, 'sharpness': 0.3, 'color': 0.3}
         self.augmentation = Compose([
             RandomCropFlip(),
-            # RandomResizeScale(size=self.size, ratio=(3. / 8, 5. / 2)),
+            RandomResizeScale(size=self.size, ratio=(3. / 8, 5. / 2)),
             RandomResizedCrop(),
             RotatePadding(up=60, colors=False), 
             ResizeLimitSquare(size=self.size),
-            # RandomMirror(),
+            RandomMirror(),
             RandomDistortion(self._transform_dict),
             # RandomRotation(),
             Normalize(mean=self.mean, std=self.std),

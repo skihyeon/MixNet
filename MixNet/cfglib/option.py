@@ -48,10 +48,13 @@ class BaseOptions(object):
 
         # backbone
         self.parser.add_argument('--scale', default=1, type=int, help='prediction on 1/scale feature map')
-        self.parser.add_argument('--net', default='FSNet_H_M', type=str,
-                                 choices=["FSNet_M", "FSNet_H_M","FSNet_hor"], help='Network architecture')
+        self.parser.add_argument('--net', default='FSNet_M', type=str,
+                                 choices=["FSNet_M", "FSNet_S","FSNet_hor", "FSNet_H_M"],
+                                 help='Network architecture')
         self.parser.add_argument('--mid', default=False, type=str2bool, help='midline predict to Transformer')
+        self.parser.add_argument('--embed', default=False, type=str2bool, help='predict embeding value for training')
         self.parser.add_argument('--know', default=False, type=str2bool, help='Knowledge Distillation')
+        self.parser.add_argument('--onlybackbone', default=False, type=str2bool, help='skip the Transformer block, only train the FSNet. ')
         
         # data args
         self.parser.add_argument('--load_memory', default=False, type=str2bool, help='Load data into memory')
@@ -69,15 +72,14 @@ class BaseOptions(object):
         self.parser.add_argument('--img_root', default=None,   type=str, help='Path to deploy images')
 
         self.parser.add_argument('--infer_path', default=None, type=str, help='inferene image or folder path')
-        self.parser.add_argument('--freeze_backbone', default=False, type=str2bool, help='Freeze backbone for transfer learning')
-        self.parser.add_argument('--gpu_num', default='2', type=str, help='GPU number')
+        self.parser.add_argument('--gpu_num', default='0', type=str, help='GPU number')
         self.parser.add_argument('--eval_dataset', default=None, choices=['All', 'my'],type=str, help='Eval dataset')
         self.parser.add_argument('--num_points', default=20, type=int, help ='sampling points')
-        # self.parser.add_argument('--temp', default=False, type=str2bool, help='temp')
         self.parser.add_argument('--custom_data_root', default="data/custom_datas", type=str, help='custom data root')
         self.parser.add_argument('--open_data_root', default="data/open_datas", type=str, help='open data root')
         self.parser.add_argument('--select_open_data', default="totaltext,MSRA-TD500,ctw1500,FUNSD,XFUND,SROIE2019", type=str, help='select open data')
         self.parser.add_argument('--select_custom_data', default="kor_extended,bnk", type=str, help='select custom data')
+        
     def parse(self, fixed=None):
 
         if fixed is not None:
