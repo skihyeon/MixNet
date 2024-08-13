@@ -54,3 +54,8 @@ do
     python eval.py --exp_name $exp_name --checkepoch $i --num_workers 4 --eval_dataset $eval_dataset --num_points 100 --mid True --gpu_num 0 --test_size 1024 1024 --net FSNet_hor
     python cal_IoU.py --pred_root ./output/$exp_name --gt_root ./data/open_datas/gts >> iou.log
 done
+
+/mnt/hdd1/sgh/MixNet/MixNet/model/240812_b2e_b2_g1_1024_filtered/MixNet_FSNet_M_1.pth
+
+python inference.py --exp_name 240812_b2e_b2_g1_1024_filtered --checkepoch 1 --num_workers 12 --infer_path /mnt/hdd1/sgh/MixNet/MixNet/data/custom_datas/bnk/Train/images --num_points 100 --test_size 2048 2048
+
