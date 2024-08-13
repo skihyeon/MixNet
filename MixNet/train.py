@@ -127,16 +127,6 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch):
                 accelerator.backward(loss)
             else:
                 loss.backward()
-
-            # 그래디언트 확인
-            for name, param in model.named_parameters():
-                if param.grad is not None:
-                    grad_norm = param.grad.norm()
-                    if torch.isnan(grad_norm):
-                        print(f"NaN gradient detected in {name}")
-                    elif grad_norm > 1000:
-                        print(f"Large gradient detected in {name}: {grad_norm}")
-            ####
                                     
             torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.grad_clip)
 
@@ -185,12 +175,18 @@ def main():
         load_model(model, cfg.resume)
         
     criterion = TextLoss()
-    lr = cfg.lr
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    filtered_parameters = []
+    params_num = []
+    for p in filter(lambda p: p.requires_grad, model.parameters()):
+        filtered_parameters.append(p)
+        params_num.append(np.prod(p.size()))
+
+    optimizer = torch.optim.AdamW(filtered_parameters, lr=cfg.lr)
+    # optimizer = torch.optim.SGD(model.parameters(), lr=lr)
 
     scheduler = lr_scheduler.StepLR(optimizer, step_size=cfg.step_size, gamma=0.9)
-
+    
     if accelerator:
         model, optimizer, train_loader, criterion, scheduler = accelerator.prepare(model, optimizer, train_loader, criterion, scheduler)
     if cfg.cuda:
@@ -202,6 +198,7 @@ def main():
 
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
+
 
 if __name__ == "__main__":
     np.random.seed(2022)

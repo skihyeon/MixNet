@@ -145,28 +145,33 @@ def count_parameters(model):
 #         # print("mixHRnet does not have pretrained weight yet. ")
 #     return model
 
+import os
 
 def FSNet_M(pretrained = True):
     model = FSNet()
     print("MixNet backbone parameter size: ", count_parameters(model))
     if pretrained:
-        # load_path = "./model/240805_pretrain_backbone/MixNet_FSNet_M_20.pth"
-        # cpt = torch.load(load_path)
-        
-        # # FSNet에 해당하는 키만 선택
-        # new_state_dict = {}
-        # for k, v in cpt['model'].items():
-        #     if k.startswith('fpn.backbone.'):
-        #         new_key = k.replace('fpn.backbone.', '')
-        #         if new_key in model.state_dict():
-        #             new_state_dict[new_key] = v
-        
-        # # 수정된 state_dict로 모델 로드
-        # model.load_state_dict(new_state_dict, strict=False)
-        # print("load pretrain weight from {}. ".format(load_path))
+        load_path = "/mnt/hdd1/sgh/MixNet/MixNet/model/240808_pretrain_backbone_b2/MixNet_FSNet_M_40.pth"
+        # load_path = ""
+        if os.path.exists(load_path):
+            cpt = torch.load(load_path)
+            
+            # FSNet에 해당하는 키만 선택
+            new_state_dict = {}
+            for k, v in cpt['model'].items():
+                if k.startswith('fpn.backbone.'):
+                    new_key = k.replace('fpn.backbone.', '')
+                    if new_key in model.state_dict():
+                        new_state_dict[new_key] = v
+            
+            # 수정된 state_dict로 모델 로드
+            model.load_state_dict(new_state_dict, strict=False)
+            print("load pretrain weight from {}. ".format(load_path))
+        else:
+            print("No pretrained weight")
         # print("Loaded keys:", len(new_state_dict))
         # print("Total model keys:", len(model.state_dict()))
-        print("No pretrained weight")
+        # print("No pretrained weight")
     else:
         print("pretraine execute")
     return model

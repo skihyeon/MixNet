@@ -35,8 +35,6 @@ class Evolution(nn.Module):
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)
 
-            for param in m.parameters():
-                param.requires_grad = True
     
     @staticmethod
     def get_boundary_proposal(input=None, seg_preds=None, switch="gt"):
