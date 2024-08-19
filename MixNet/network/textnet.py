@@ -21,10 +21,8 @@ class Evolution(nn.Module):
         self.clip_dis = 100
 
         self.iter = 3
-        # self.iter = 6
         for i in range(self.iter):
             evolve_gcn = Transformer(seg_channel, 128, num_heads=8, dim_feedforward=1024, drop_rate=0.0, if_resi=True, block_nums=3)
-            # evolve_gcn = Transformer(seg_channel, 192, num_heads=12, dim_feedforward=1536, drop_rate=0.1, if_resi=True, block_nums=4)
             self.__setattr__('evolve_gcn' + str(i), evolve_gcn)
         if not is_training:
             self.iter = 1
@@ -196,12 +194,6 @@ class TextNet(nn.Module):
             return output
 
         cnn_feats = torch.cat([up1, fy_preds], dim=1)
-        if cfg.embed: #or cfg.mid:
-            embed_feature = self.embed_head(up1)
-            # embed_feature = self.overlap_head(up1)
-            # if not self.training:
-                # andpart = embed_feature[0][0] * embed_feature[0][1]
-
         if cfg.mid:
             py_preds, inds, confidences, midline = self.BPN(cnn_feats, input=input_dict, seg_preds=fy_preds, switch="gt")
         else:
@@ -213,8 +205,6 @@ class TextNet(nn.Module):
         output["confidences"] = confidences
         if cfg.mid:
             output["midline"] = midline
-        if cfg.embed : # or cfg.mid:
-            output["embed"] = embed_feature
 
         # print(py_preds)
         return output
@@ -222,66 +212,128 @@ class TextNet(nn.Module):
 import time
 ## try to excute "python -m network.textnet"
 # If you want excute this, please change line 200, switch="gt" to switch="else"
+
+
 if __name__ == "__main__":
+    # 입력 데이터 준비
     import torch.optim as optim
+    from torch.profiler import profile, record_function, ProfilerActivity
+    from cfglib.config import config as cfg
+    from torch.cuda.amp import autocast, GradScaler
 
-    def test_model_training(model, input_size=(1, 3, 224, 224), iterations=100):
-        model.train()  # 모델을 학습 모드로 설정
-        optimizer = optim.Adam(model.parameters(), lr=0.001)
-        criterion = nn.MSELoss()  # 예시로 MSE 손실 함수 사용
+    class TimerModule(nn.Module):
+        def __init__(self, module, name):
+            super().__init__()
+            self.module = module
+            self.name = name
 
-        input_tensor = torch.randn(input_size).to(cfg.device)
-        input_dict = {
-            "img": input_tensor,
-            "train_mask": torch.randn(input_size).to(cfg.device),
-            "tr_mask": torch.randn(input_size).to(cfg.device),
-            "distance_field": torch.randn(input_size).to(cfg.device),
-            "direction_field": torch.randn(input_size).to(cfg.device),
-            "weight_matrix": torch.randn(input_size).to(cfg.device),
-            "gt_points": torch.randn((1, 100, 2)).to(cfg.device),  # 예시 크기
-            "proposal_points": torch.randn((1, 100, 2)).to(cfg.device),  # 예시 크기
-            "ignore_tags": torch.randn((1, 100)).to(cfg.device),  # 예시 크기
-            "edge_field": torch.randn(input_size).to(cfg.device)
-        }
+        def forward(self, *args, **kwargs):
+            start = torch.cuda.Event(enable_timing=True)
+            end = torch.cuda.Event(enable_timing=True)
+            start.record()
+            result = self.module(*args, **kwargs)
+            end.record()
+            torch.cuda.synchronize()
+            print(f"{self.name} 실행 시간: {start.elapsed_time(end):.2f} ms")
+            return result
+
+    def wrap_module(model, module_name):
+        module = getattr(model, module_name)
+        setattr(model, module_name, TimerModule(module, module_name))
+
+    def profile_model(model, input_dict, iterations=100):
+        model.train()
+        optimizer = optim.AdamW(model.parameters(), lr=0.001)
+        criterion = nn.MSELoss()
+        scaler = GradScaler()
+
+        # 각 주요 컴포넌트에 TimerModule 적용
+        wrap_module(model, 'fpn')
+        wrap_module(model, 'seg_head')
+        if hasattr(model, 'embed_head'):
+            wrap_module(model, 'embed_head')
+        if hasattr(model, 'BPN'):
+            wrap_module(model, 'BPN')
 
         # 워밍업
         for _ in range(10):
             optimizer.zero_grad()
-            output = model(input_dict)
-            loss = criterion(output["py_preds"][-1], input_dict["gt_points"])
-            loss.backward()
-            optimizer.step()
+            with autocast():
+                up1 = model.fpn(input_dict["img"])
+                preds = model.seg_head(up1)
+                fy_preds = torch.cat([preds[:, 0:2, :, :], preds[:, 2:4, :, :]], dim=1)
+                if hasattr(model, 'embed_head'):
+                    embed_feature = model.embed_head(up1)
+                dummy_target = torch.randn_like(fy_preds)
+                loss = criterion(fy_preds, dummy_target)
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
 
-        torch.cuda.reset_peak_memory_stats()  # 메모리 통계 초기화
+        torch.cuda.reset_peak_memory_stats()
         torch.cuda.synchronize()
         start_time = time.time()
-        for _ in range(iterations):
-            optimizer.zero_grad()
-            output = model(input_dict)
-            loss = criterion(output["py_preds"][-1], input_dict["gt_points"])
-            loss.backward()
-            optimizer.step()
+
+        with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
+                    record_shapes=True,
+                    profile_memory=True,
+                    with_stack=True) as prof:
+            for _ in range(iterations):
+                with record_function("iteration"):
+                    optimizer.zero_grad()
+                    with record_function("forward"), autocast():
+                        up1 = model.fpn(input_dict["img"])
+                        preds = model.seg_head(up1)
+                        fy_preds = torch.cat([preds[:, 0:2, :, :], preds[:, 2:4, :, :]], dim=1)
+                        if hasattr(model, 'embed_head'):
+                            embed_feature = model.embed_head(up1)
+                        dummy_target = torch.randn_like(fy_preds)
+                    with record_function("loss"), autocast():
+                        loss = criterion(fy_preds, dummy_target)
+                    with record_function("backward"):
+                        scaler.scale(loss).backward()
+                    with record_function("optimizer_step"):
+                        scaler.step(optimizer)
+                        scaler.update()
+
         torch.cuda.synchronize()
         end_time = time.time()
 
-        max_memory = torch.cuda.max_memory_allocated() / (1024 * 1024)  # MB 단위로 변환
+        avg_time = (end_time - start_time) / iterations
+        max_memory = torch.cuda.max_memory_allocated() / (1024 * 1024)  # MB 단위
 
-        return (end_time - start_time) / iterations, max_memory
+        print(f"평균 반복 시간: {avg_time:.5f}초")
+        print(f"최대 메모리 사용량: {max_memory:.2f} MB")
 
-    # 기본 모델
-    model_base = TextNet(backbone='FSNet_M', is_training=True)
-    model_base.to(cfg.device)
-    time_base, memory_base = test_model_training(model_base)
-    print(f"기본 모델 평균 학습 시간: {time_base:.5f}초, 최대 메모리 사용량: {memory_base:.2f} MB")
+        print("\n--- Profiler 결과 ---")
+        print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=10))
 
-    # 파라미터 증가 모델
-    model_param = TextNet(backbone='FSNet_M', is_training=True)
-    for i in range(model_param.BPN.iter):
-        evolve_gcn = Transformer(36, 256, num_heads=16, dim_feedforward=2048, drop_rate=0.0, if_resi=True, block_nums=6)
-        model_param.BPN.__setattr__('evolve_gcn' + str(i), evolve_gcn)
-    model_param.to(cfg.device)
-    time_param, memory_param = test_model_training(model_param)
-    print(f"파라미터 증가 모델 평균 학습 시간: {time_param:.5f}초, 최대 메모리 사용량: {memory_param:.2f} MB")
+        return avg_time, max_memory
 
-    print(f"파라미터 증가로 인한 학습 시간 증가: {(time_param - time_base) / time_base * 100:.2f}%")
-    print(f"파라미터 증가로 인한 메모리 사용량 증가: {(memory_param - memory_base) / memory_base * 100:.2f}%")
+    input_size=(1, 3, 224, 224)
+    input_tensor = torch.randn(input_size).to(cfg.device)
+    input_dict = {
+        "img": input_tensor,
+        "train_mask": torch.randn(input_size).to(cfg.device),
+        "tr_mask": torch.randn(input_size).to(cfg.device),
+        "distance_field": torch.randn(input_size).to(cfg.device),
+        "direction_field": torch.randn(input_size).to(cfg.device),
+        "weight_matrix": torch.randn(input_size).to(cfg.device),
+        "gt_points": torch.randn((1, cfg.num_points, 2)).to(cfg.device),  # cfg.num_points 사용
+        "proposal_points": torch.randn((1, cfg.num_points, 2)).to(cfg.device),  # cfg.num_points 사용
+        "ignore_tags": torch.ones((1, cfg.num_points)).to(cfg.device),  # 모든 포인트를 사용하도록 설정
+        "edge_field": torch.randn(input_size).to(cfg.device)
+    }
+    # 기본 모델 프로파일링
+    print("=== 기본 모델 프로파일링 ===")
+    model_base = TextNet(backbone='FSNet_M', is_training=True).to(cfg.device)
+    time_base, memory_base = profile_model(model_base, input_dict)
+
+    # 결과 출력
+    print("\n=== 결과 ===")
+    print(f"학습 시간: {time_base:.5f}초")
+    print(f"메모리 사용량: {memory_base:.2f} MB")
+
+    # 추가 분석: 모델 파라미터 수
+    base_params = sum(p.numel() for p in model_base.parameters() if p.requires_grad)
+    print(f"\n모델 파라미터 수: {base_params}")
