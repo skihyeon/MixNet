@@ -46,18 +46,20 @@ class reduceBlock(nn.Module):
         super().__init__()
         self.conv1x1 = nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=1, padding=0, bias=False)
         self.conv3x3 = nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1, padding=1, bias=False)
-        self.bn1 = nn.BatchNorm2d(out_channels)
-        self.bn2 = nn.BatchNorm2d(out_channels)
+        # self.bn1 = nn.BatchNorm2d(out_channels)
+        # self.bn2 = nn.BatchNorm2d(out_channels)
+        self.ln1 = nn.GroupNorm(1, out_channels)  # LayerNorm 대신 GroupNorm 사용
+        self.ln2 = nn.GroupNorm(1, out_channels)
         if up:
             self.deconv = nn.ConvTranspose2d(out_channels, out_channels, kernel_size=4, stride=2, padding=1) 
         else:
             self.deconv = None
     def forward(self, x):
         x = self.conv1x1(x)
-        x = self.bn1(x)
+        x = self.ln1(x)
         x = F.relu(x)
         x = self.conv3x3(x)
-        x = self.bn2(x)
+        x = self.ln2(x)
         x = F.relu(x)
         if self.deconv:
             x = self.deconv(x)

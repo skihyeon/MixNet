@@ -7,9 +7,11 @@ class block(nn.Module):
         super(block, self).__init__()
         self.dcn = dcn
         self.conv1 = nn.Conv2d(inplanes, planes, 3, 1, 1, bias = False)
-        self.bn1 = nn.BatchNorm2d(planes)
+        # self.bn1 = nn.BatchNorm2d(planes)
+        self.ln1 = nn.GroupNorm(1, planes)
         self.conv2 = nn.Conv2d(planes, planes, 3, 1, 1, bias = False)
-        self.bn2 = nn.BatchNorm2d(planes)
+        # self.bn2 = nn.BatchNorm2d(planes)
+        self.ln2 = nn.GroupNorm(1, planes) 
         self.relu = nn.ReLU(inplace=True)
         self.resid = None
         if inplanes != planes:
@@ -21,11 +23,11 @@ class block(nn.Module):
             residual = self.resid(residual)
 
         x = self.conv1(x)
-        x = self.bn1(x)
+        x = self.ln1(x)
         x = self.relu(x)
 
         x = self.conv2(x)
-        x = self.bn2(x)
+        x = self.ln2(x)
         x += residual
         x = self.relu(x)
 
@@ -80,10 +82,12 @@ class FSNet(nn.Module):
 
         self.stem = nn.Sequential(
             nn.Conv2d(3, channels, 7, 2, 3, bias = False),
-            nn.BatchNorm2d(channels),
+            # nn.BatchNorm2d(channels),
+            nn.GroupNorm(1, channels),
             nn.ReLU(True),
             nn.Conv2d(channels, channels, 3, 1, 1, bias = False),
-            nn.BatchNorm2d(channels),
+            # nn.BatchNorm2d(channels),
+            nn.GroupNorm(1, channels),
             nn.ReLU(True),
         )
 
@@ -91,7 +95,8 @@ class FSNet(nn.Module):
             self.steps.append(
                 nn.Sequential(
                     nn.Conv2d(channels, channels, 3, 2, 1, bias = False),
-                    nn.BatchNorm2d(channels),
+                    # nn.BatchNorm2d(channels),
+                    nn.GroupNorm(1 , channels),
                     nn.ReLU(True),
                 )
             )
@@ -151,24 +156,24 @@ def FSNet_M(pretrained = True):
     model = FSNet()
     print("MixNet backbone parameter size: ", count_parameters(model))
     if pretrained:
-        # load_path = "/mnt/hdd1/sgh/MixNet/MixNet/model/240808_pretrain_backbone_b2/MixNet_FSNet_M_40.pth"
-        # # load_path = ""
-        # if os.path.exists(load_path):
-        #     cpt = torch.load(load_path)
+    #     load_path = "/mnt/hdd1/sgh/MixNet/MixNet/model/240808_pretrain_backbone_b2/MixNet_FSNet_M_40.pth"
+    #     # load_path = ""
+    #     if os.path.exists(load_path):
+    #         cpt = torch.load(load_path)
             
-        #     # FSNet에 해당하는 키만 선택
-        #     new_state_dict = {}
-        #     for k, v in cpt['model'].items():
-        #         if k.startswith('fpn.backbone.'):
-        #             new_key = k.replace('fpn.backbone.', '')
-        #             if new_key in model.state_dict():
-        #                 new_state_dict[new_key] = v
+    #         # FSNet에 해당하는 키만 선택
+    #         new_state_dict = {}
+    #         for k, v in cpt['model'].items():
+    #             if k.startswith('fpn.backbone.'):
+    #                 new_key = k.replace('fpn.backbone.', '')
+    #                 if new_key in model.state_dict():
+    #                     new_state_dict[new_key] = v
             
-        #     # 수정된 state_dict로 모델 로드
-        #     model.load_state_dict(new_state_dict, strict=False)
-        #     print("load pretrain weight from {}. ".format(load_path))
-        # else:
-        #     print("No pretrained weight")
+    #         # 수정된 state_dict로 모델 로드
+    #         model.load_state_dict(new_state_dict, strict=False)
+    #         print("load pretrain weight from {}. ".format(load_path))
+    #     else:
+    #         print("No pretrained weight")
         # print("Loaded keys:", len(new_state_dict))
         # print("Total model keys:", len(model.state_dict()))
         print("No pretrained weight")

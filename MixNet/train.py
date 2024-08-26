@@ -19,11 +19,24 @@ from cfglib.option import BaseOptions
 
 from tqdm.auto import tqdm
 from accelerate import Accelerator, DistributedDataParallelKwargs
+import wandb
 
 kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
 accelerator = Accelerator(kwargs_handlers=[kwargs])
 # accelerator = Accelerator()
 train_step = 0
+
+
+def init_wandb(cfg):
+    if accelerator.is_main_process:
+        wandb.login(key=os.environ.get("WANDB_API_KEY"))
+        wandb.init(
+            project="MixNet",
+            name=cfg.exp_name,
+            config=vars(cfg),
+            entity = os.environ.get("WANDB_ENTITY")
+        )
+
 
 def save_model(model, epoch, lr):
     save_dir = os.path.join(cfg.save_dir, cfg.exp_name)
@@ -109,7 +122,7 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch):
     log_path = os.path.join(log_dir, 'train_log.txt')
     if not os.path.exists(log_dir):
         mkdirs(log_dir)
-    
+
     with open(log_path, 'a') as log_file:
         pbar = tqdm(train_loader, desc=f"Epoch {epoch}")
         for i, inputs in enumerate(pbar):
@@ -118,10 +131,10 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch):
             input_dict = _parse_data(inputs)
 
             output_dict = model(input_dict)
-            loss_dict = criterion(input_dict, output_dict, eps=epoch+1)
+            loss_dict = criterion(input_dict, output_dict)
             loss = loss_dict["total_loss"]
 
-            optimizer.zero_grad()
+            # optimizer.zero_grad()
 
             if accelerator:
                 accelerator.backward(loss)
@@ -147,6 +160,15 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch):
 
             # 로그 파일에 학습 정보 저장
             log_file.write(f'Epoch: {epoch}, Step: {i}, Loss: {losses.avg:.2f}, Max Memory: {max_memory:.2f} MB\n')
+            
+            if accelerator.is_main_process:
+                wandb.log({
+                    "epoch": epoch,
+                    "step": train_step,
+                    "loss": losses.avg,
+                    "lr": scheduler.get_lr()[0],
+                    "max_memory": max_memory
+                })
 
             # 메모리 정리
             del input_dict, output_dict, loss_dict, loss
@@ -158,7 +180,8 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch):
 
 def main():
     global lr
-
+    init_wandb(cfg)
+    
     dataset_params = {
         "config": cfg,
         "is_training" : True
@@ -183,7 +206,7 @@ def main():
         params_num.append(np.prod(p.size()))
 
     optimizer = torch.optim.AdamW(filtered_parameters, lr=cfg.lr)
-    # optimizer = torch.optim.SGD(model.parameters(), lr=lr)
+    # optimizer = torch.optim.SGD(model.parameters(), lr=cfg.lr)
 
     scheduler = lr_scheduler.StepLR(optimizer, step_size=cfg.step_size, gamma=0.9)
     

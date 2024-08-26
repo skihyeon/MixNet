@@ -57,5 +57,5 @@ done
 
 /mnt/hdd1/sgh/MixNet/MixNet/model/240812_b2e_b2_g1_1024_filtered/MixNet_FSNet_M_1.pth
 
-python inference.py --exp_name 240812_b2e_b2_g1_1024_filtered --checkepoch 1 --num_workers 12 --infer_path /mnt/hdd1/sgh/MixNet/MixNet/data/custom_datas/bnk/Train/images --num_points 100 --test_size 2048 2048
+python inference.py --exp_name 240823_e2e_b2_LN --checkepoch 15 --num_workers 12 --infer_path "/mnt/hdd1/sgh/MixNet/MixNet/infer_test_datas/무환샘플 통관용 BL-002.jpg" --num_points 100 --test_size 2048 2048
 
