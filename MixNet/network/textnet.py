@@ -117,13 +117,6 @@ class Evolution(nn.Module):
             init_polys = self.evolve_poly(evolve_gcn, embed_feature, init_polys, inds[0])
             py_preds.append(init_polys)
 
-            # if self.is_training and evolve_gcn.parameters() is not None:
-            #     for name, param in evolve_gcn.named_parameters():
-            #         if param.grad is not None:
-            #             print(f"evolve_gcn{i} {name} grad norm: {param.grad.norm().item()}")
-            #         else:
-            #             print(f"evolve_gcn{i} {name} has no grad")
-
         return py_preds, inds, confidences
     
 def count_parameters(model):
@@ -145,26 +138,24 @@ class TextNet(nn.Module):
             nn.Conv2d(16, 4, kernel_size=1, stride=1, padding=0),
         )
 
-        if cfg.embed:
-            self.embed_head = nn.Sequential(
-                nn.Conv2d(32, 16, kernel_size=3, padding=2, dilation=2),
-                nn.PReLU(),
-                nn.Conv2d(16, 16, kernel_size=3, padding=4, dilation=4),
-                nn.PReLU(),
-                nn.Conv2d(16, 4, kernel_size=1, stride=1, padding=0),
-                nn.Conv2d(4, 2, kernel_size=1, stride=1, padding=0),
-            )
-            # self.embed_head = nn.Conv2d(32, 1, kernel_size=1, stride=1, padding=0),
         if not cfg.onlybackbone:
             if cfg.mid:
                 self.BPN = midlinePredictor(seg_channel=32+4, is_training=is_training)
-            elif cfg.embed:
-                self.BPN = Evolution(cfg.num_points, seg_channel=32+4+2, is_training=is_training, device=cfg.device)
             else:
                 self.BPN = Evolution(cfg.num_points, seg_channel=32+4, is_training=is_training, device=cfg.device)
 
         print(f"Total MixNet with {self.backbone_name} parameter size: ", count_parameters(self))
+        
+    def train(self, mode=True):
+        super().train(mode)
+        self.is_training = mode
+        if hasattr(self, 'BPN'):
+            self.BPN.is_training = mode
+        return self
 
+    def eval(self):
+        return self.train(False)
+    
     def load_model(self, model_path):
         print('Loading from {}'.format(model_path))
         state_dict = torch.load(model_path, map_location=torch.device(cfg.device))
@@ -181,14 +172,11 @@ class TextNet(nn.Module):
             image[:, :, :h, :w] = input_dict["img"][:, :, :, :]
 
         up1 = self.fpn(image)
-        if cfg.know or knowledge:
-            output["image_feature"] = up1
-        if knowledge:
-            return output
+
         preds = self.seg_head(up1)
 
         fy_preds = torch.cat([torch.sigmoid(preds[:, 0:2, :, :]), preds[:, 2:4, :, :]], dim=1)
-        # fy_preds = torch.cat([preds[:, 0:2, :, :], preds[:, 2:4, :, :]], dim=1)
+
         if cfg.onlybackbone:
             output["fy_preds"] = fy_preds
             return output
