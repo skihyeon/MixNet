@@ -17,6 +17,8 @@ from util.misc import mkdirs, to_device
 from util.visualize import visualize_network_output
 from cfglib.option import BaseOptions
 
+from util.IoU import get_metric
+from util.misc import rescale_result
 from tqdm.auto import tqdm
 from accelerate import Accelerator, DistributedDataParallelKwargs
 import wandb
@@ -165,7 +167,7 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch):
                 wandb.log({
                     "epoch": epoch,
                     "step": train_step,
-                    "loss": losses.avg,
+                    "train_loss": losses.avg,
                     "lr": scheduler.get_lr()[0],
                     "max_memory": max_memory
                 })
@@ -177,6 +179,60 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch):
 
     if epoch % cfg.save_freq == 0:
         save_model(model, epoch, scheduler.get_lr())
+
+
+def inference(model, test_loader, criterion):
+    model.eval()
+    pbar = tqdm(test_loader, desc="Valid")
+    total_hit_rate = 0
+    total_precision = 0
+    total_recall = 0
+    total_hmean = 0
+    num_images = 0
+
+    for i, (image, meta) in enumerate(pbar):
+        input_dict = dict()
+        H,W = meta['Height'][0].item(), meta['Width'][0].item()
+
+        img_show = image[0].permute(1,2,0).cpu().numpy()
+        image= image.to(cfg.device, non_blocking=True)
+        input_dict['img'] = image
+
+        with torch.no_grad():
+            output_dict = model(input_dict, test_speed=True)
+        torch.cuda.synchronize()
+
+        gt_contours = []
+        for annot, n_annot in zip(meta['annotation'][0], meta['n_annotation'][0]):
+            if n_annot.item() > 0:
+                gt_contours.append(annot[:n_annot].int().cpu().numpy())
+        contours = output_dict["py_preds"][-1].int().cpu().numpy()
+        _, contours = rescale_result(img_show, contours, H, W)
+        hit_rate = len(contours)/len(gt_contours) if gt_contours else 0
+        precision, recall, hmean = get_metric(gt_contours, contours)
+
+        total_hit_rate += hit_rate
+        total_precision += precision
+        total_recall += recall
+        total_hmean += hmean
+        num_images += 1
+        # pbar.set_postfix({'hit_rates': f'{hit_rate}', "precision/recall/hmean": f'{precision:.4f}/{recall:.4f}/{hmean:.4f}'})
+
+    avg_hit_rate = total_hit_rate / num_images
+    avg_precision = total_precision / num_images
+    avg_recall = total_recall / num_images
+    avg_hmean = total_hmean / num_images
+    
+    wandb.log({
+        "hit_rate": avg_hit_rate,
+        "f1": {
+            "precision": avg_precision,
+            "recall": avg_recall,
+            "hmean": avg_hmean
+        }
+    })
+
+
 
 def main():
     global lr
@@ -192,6 +248,11 @@ def main():
                                        shuffle=True, num_workers=cfg.num_workers,
                                        pin_memory=True, generator=torch.Generator(device=cfg.device))
     
+    testset = AllDataset(config=cfg, is_training=False)
+    test_loader = data.DataLoader(testset, batch_size=1,
+                                       shuffle=False, num_workers=0,
+                                       )
+
     model = TextNet(backbone=cfg.net, is_training=True)
 
     if cfg.resume:
@@ -206,7 +267,6 @@ def main():
         params_num.append(np.prod(p.size()))
 
     optimizer = torch.optim.AdamW(filtered_parameters, lr=cfg.lr)
-    # optimizer = torch.optim.SGD(model.parameters(), lr=cfg.lr)
 
     scheduler = lr_scheduler.StepLR(optimizer, step_size=cfg.step_size, gamma=0.9)
     
@@ -217,7 +277,12 @@ def main():
 
     for epoch in range(cfg.start_epoch, cfg.max_epoch+1):
         scheduler.step()
+        model.train()  # 훈련 모드로 설정
         train(model, train_loader, criterion, scheduler, optimizer, epoch)
+        
+        if epoch % 5 == 0 and epoch != 0:
+            model.eval()  # 평가 모드로 설정
+            inference(model, test_loader, criterion)
 
     if torch.cuda.is_available():
         torch.cuda.empty_cache()

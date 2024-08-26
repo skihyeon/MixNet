@@ -145,7 +145,17 @@ class TextNet(nn.Module):
                 self.BPN = Evolution(cfg.num_points, seg_channel=32+4, is_training=is_training, device=cfg.device)
 
         print(f"Total MixNet with {self.backbone_name} parameter size: ", count_parameters(self))
+        
+    def train(self, mode=True):
+        super().train(mode)
+        self.is_training = mode
+        if hasattr(self, 'BPN'):
+            self.BPN.is_training = mode
+        return self
 
+    def eval(self):
+        return self.train(False)
+    
     def load_model(self, model_path):
         print('Loading from {}'.format(model_path))
         state_dict = torch.load(model_path, map_location=torch.device(cfg.device))
