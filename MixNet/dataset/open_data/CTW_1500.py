@@ -73,8 +73,8 @@ class CTW_1500(TextDataset):
             pass
         else:
             annotation_id = self.annotation_list[item]
-            annotation_path = os.path.join(self.annotation_root, "000" + annotation_id)
-            polygons = self.parse_carve_txt(annotation_path)
+            annotation_path = os.path.join(self.annotation_root, annotation_id)
+            polygons = self.parse_carve_text(annotation_path)
 
         data = dict()
         data["image"] = image

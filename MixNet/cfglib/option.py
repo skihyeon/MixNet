@@ -33,7 +33,6 @@ class BaseOptions(object):
 
         self.parser.add_argument('--num_workers', default=32, type=int, help='Number of workers used in dataloading')
         self.parser.add_argument('--cuda', default=True, type=str2bool, help='Use cuda to train model')
-        self.parser.add_argument('--mgpu', action='store_true', help='Use multi-gpu to train model')
         self.parser.add_argument('--save_dir', default='./model/', help='Path to save checkpoint models')
         self.parser.add_argument('--vis_dir', default='./vis/', help='Path to save visualization images')
         self.parser.add_argument('--viz', default=False, type=str2bool, help='Whether to output debug info')
@@ -79,6 +78,7 @@ class BaseOptions(object):
         self.parser.add_argument('--open_data_root', default="data/open_datas", type=str, help='open data root')
         self.parser.add_argument('--select_open_data', default="totaltext,MSRA-TD500,ctw1500,FUNSD,XFUND,SROIE2019", type=str, help='select open data')
         self.parser.add_argument('--select_custom_data', default="kor_extended,bnk", type=str, help='select custom data')
+        self.parser.add_argument('--wandb', action='store_true')
         
     def parse(self, fixed=None):
 

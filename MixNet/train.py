@@ -30,14 +30,15 @@ train_step = 0
 
 
 def init_wandb(cfg):
-    if accelerator.is_main_process:
-        wandb.login(key=os.environ.get("WANDB_API_KEY"))
-        wandb.init(
-            project="MixNet",
-            name=cfg.exp_name,
-            config=vars(cfg),
-            entity = os.environ.get("WANDB_ENTITY")
-        )
+    wandb.login(key=os.environ.get("WANDB_API_KEY"))
+    wandb.init(
+        project="MixNet",
+        name=cfg.exp_name,
+        config=vars(cfg),
+        entity = os.environ.get("WANDB_ENTITY"),
+        save_code= True,   
+        resume=True,
+    )
 
 
 def save_model(model, epoch, lr):
@@ -104,6 +105,8 @@ def _parse_data(inputs):
     return input_dict
 
 def train(model, train_loader, criterion, scheduler, optimizer, epoch):
+    if cfg.wandb:
+        wandb.watch(model, criterion, log="all", log_freq=10)
     global train_step
 
     losses = AverageMeter()
@@ -137,7 +140,7 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch):
             loss = loss_dict["total_loss"]
 
             # optimizer.zero_grad()
-
+            model.zero_grad()
             if accelerator:
                 accelerator.backward(loss)
             else:
@@ -145,8 +148,10 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch):
                                     
             torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.grad_clip)
 
-            optimizer.step()
             
+            optimizer.step()
+            scheduler.step()
+
             losses.update(loss.item())
 
             batch_time.update(time.time()-end)
@@ -163,13 +168,11 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch):
             # 로그 파일에 학습 정보 저장
             log_file.write(f'Epoch: {epoch}, Step: {i}, Loss: {losses.avg:.2f}, Max Memory: {max_memory:.2f} MB\n')
             
-            if accelerator.is_main_process:
+            if accelerator.is_main_process and cfg.wandb:
                 wandb.log({
                     "epoch": epoch,
-                    "step": train_step,
                     "train_loss": losses.avg,
-                    "lr": scheduler.get_lr()[0],
-                    "max_memory": max_memory
+                    "lr": scheduler.get_lr()[0]
                 })
 
             # 메모리 정리
@@ -207,7 +210,7 @@ def inference(model, test_loader, criterion):
             if n_annot.item() > 0:
                 gt_contours.append(annot[:n_annot].int().cpu().numpy())
         contours = output_dict["py_preds"][-1].int().cpu().numpy()
-        _, contours = rescale_result(img_show, contours, H, W)
+        # _, contours = rescale_result(img_show, contours, H, W)
         hit_rate = len(contours)/len(gt_contours) if gt_contours else 0
         precision, recall, hmean = get_metric(gt_contours, contours)
 
@@ -216,34 +219,31 @@ def inference(model, test_loader, criterion):
         total_recall += recall
         total_hmean += hmean
         num_images += 1
-        # pbar.set_postfix({'hit_rates': f'{hit_rate}', "precision/recall/hmean": f'{precision:.4f}/{recall:.4f}/{hmean:.4f}'})
+        pbar.set_postfix({'hr': f'{hit_rate}', "f1": f'{precision:.2f}/{recall:.2f}/{hmean:.2f}'})
 
     avg_hit_rate = total_hit_rate / num_images
     avg_precision = total_precision / num_images
     avg_recall = total_recall / num_images
     avg_hmean = total_hmean / num_images
     
-    wandb.log({
-        "hit_rate": avg_hit_rate,
-        "f1": {
-            "precision": avg_precision,
-            "recall": avg_recall,
-            "hmean": avg_hmean
-        }
-    })
+    if accelerator.is_main_process and cfg.wandb:
+        wandb.log({
+            "hit_rate": avg_hit_rate,
+            "f1": {
+                "precision": avg_precision,
+                "recall": avg_recall,
+                "hmean": avg_hmean
+            }
+        })
 
 
 
 def main():
     global lr
-    init_wandb(cfg)
+    if accelerator.is_main_process and cfg.wandb:
+        init_wandb(cfg)
     
-    dataset_params = {
-        "config": cfg,
-        "is_training" : True
-    }
-
-    trainset = AllDataset_mid(**dataset_params) if cfg.mid else AllDataset(**dataset_params)
+    trainset = AllDataset_mid(config=cfg, is_training=True) if cfg.mid else AllDataset(config=cfg, is_training=True)
     train_loader = data.DataLoader(trainset, batch_size=cfg.batch_size,
                                        shuffle=True, num_workers=cfg.num_workers,
                                        pin_memory=True, generator=torch.Generator(device=cfg.device))
@@ -266,24 +266,25 @@ def main():
         filtered_parameters.append(p)
         params_num.append(np.prod(p.size()))
 
-    optimizer = torch.optim.AdamW(filtered_parameters, lr=cfg.lr)
 
-    scheduler = lr_scheduler.StepLR(optimizer, step_size=cfg.step_size, gamma=0.9)
-    
+    optimizer = torch.optim.AdamW(filtered_parameters, lr=cfg.lr)
+    total_iterations = len(train_loader) * 20
+
+    # scheduler = lr_scheduler.StepLR(optimizer, step_size=cfg.step_size, gamma=0.9)
+    scheduler = lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=total_iterations)
+
     if accelerator:
         model, optimizer, train_loader, criterion, scheduler = accelerator.prepare(model, optimizer, train_loader, criterion, scheduler)
     if cfg.cuda:
         cudnn.benchmark = True
 
     for epoch in range(cfg.start_epoch, cfg.max_epoch+1):
-        scheduler.step()
         model.train()  # 훈련 모드로 설정
         train(model, train_loader, criterion, scheduler, optimizer, epoch)
-        
-        if epoch % 5 == 0 and epoch != 0:
+        if epoch > 0:
             model.eval()  # 평가 모드로 설정
             inference(model, test_loader, criterion)
-
+        
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
 
@@ -297,11 +298,11 @@ if __name__ == "__main__":
 
     update_config(cfg, args)
     
-    if accelerator:
-        if accelerator.is_main_process:
-            print_config(cfg)
-    else:
-        print_config(cfg)
+    # if accelerator:
+    #     if accelerator.is_main_process:
+    #         print_config(cfg)
+    # else:
+    #     print_config(cfg)
 
     log_dir = os.path.join(cfg.save_dir, cfg.exp_name)
     os.makedirs(log_dir, exist_ok=True)
