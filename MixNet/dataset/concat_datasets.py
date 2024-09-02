@@ -71,10 +71,12 @@ def hierarchical_custom_dataset(config, is_training, custom_data_root, select_da
     else:
         folders_to_process = select_data.split(',')
 
+    dataset_log = ""
+    sub_dataset_logs = []
+
     if folders_to_process:
         dataset_log = f'dataset_root: {custom_data_root}\t selected_dataset: {folders_to_process}'
         dataset_log += '\n' + '-'*100
-        print(dataset_log)
 
     for folder in folders_to_process:
         folder_path = os.path.join(custom_data_root, folder.strip())
@@ -86,12 +88,15 @@ def hierarchical_custom_dataset(config, is_training, custom_data_root, select_da
                 load_memory = config.load_memory
             )
             sub_dataset_log = f'folder: {folder.strip():<20} num samples: {len(dataset):<6}'
-            print(sub_dataset_log)
+            sub_dataset_logs.append(sub_dataset_log)
             dataset_list.append(dataset)
         else:
-            print(f'경고: {folder_path} 경로가 존재하지 않습니다.')
+            sub_dataset_logs.append(f'경고: {folder_path} 경로가 존재하지 않습니다.')
     
     if dataset_list:
+        print(dataset_log)
+        for log in sub_dataset_logs:
+            print(log)
         print('-'*100)
         return ConcatDataset(dataset_list)
     return None
@@ -167,10 +172,12 @@ def hierarchical_custom_dataset_mid(config, is_training, custom_data_root, selec
     else:
         folders_to_process = select_data.split(',')
 
+    dataset_log = ""
+    sub_dataset_logs = []
+
     if folders_to_process:
         dataset_log = f'dataset_root: {custom_data_root}\t selected_dataset: {folders_to_process}'
         dataset_log += '\n' + '-'*100
-        print(dataset_log)
 
     for folder in folders_to_process:
         folder_path = os.path.join(custom_data_root, folder.strip())
@@ -182,12 +189,15 @@ def hierarchical_custom_dataset_mid(config, is_training, custom_data_root, selec
                 load_memory = config.load_memory
             )
             sub_dataset_log = f'folder: {folder.strip():<20} num samples: {len(dataset):<6}'
-            print(sub_dataset_log)
+            sub_dataset_logs.append(sub_dataset_log)
             dataset_list.append(dataset)
         else:
-            print(f'경고: {folder_path} 경로가 존재하지 않습니다.')
+            sub_dataset_logs.append(f'경고: {folder_path} 경로가 존재하지 않습니다.')
     
     if dataset_list:
+        print(dataset_log)
+        for log in sub_dataset_logs:
+            print(log)
         print('-'*100)
         return ConcatDataset(dataset_list)
     return None

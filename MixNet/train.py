@@ -36,8 +36,7 @@ def init_wandb(cfg):
         name=cfg.exp_name,
         config=vars(cfg),
         entity = os.environ.get("WANDB_ENTITY"),
-        save_code= True,   
-        resume=True,
+        save_code= True,
     )
 
 
@@ -179,7 +178,6 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch):
             del input_dict, output_dict, loss_dict, loss
             torch.cuda.empty_cache()
             gc.collect()
-
     if epoch % cfg.save_freq == 0:
         save_model(model, epoch, scheduler.get_lr())
 
@@ -237,7 +235,6 @@ def inference(model, test_loader, criterion):
         })
 
 
-
 def main():
     global lr
     if accelerator.is_main_process and cfg.wandb:
@@ -245,9 +242,13 @@ def main():
     
     trainset = AllDataset_mid(config=cfg, is_training=True) if cfg.mid else AllDataset(config=cfg, is_training=True)
     train_loader = data.DataLoader(trainset, batch_size=cfg.batch_size,
-                                       shuffle=True, num_workers=cfg.num_workers,
-                                       pin_memory=True, generator=torch.Generator(device=cfg.device))
+                                   shuffle=True, num_workers=cfg.num_workers,
+                                   pin_memory=True, generator=torch.Generator(device=cfg.device),)  # collate_fn 추가
     
+    testset = AllDataset(config=cfg, is_training=False)
+    test_loader = data.DataLoader(testset, batch_size=1,
+                                  shuffle=False, num_workers=0,)  # collate_fn 추가
+
     testset = AllDataset(config=cfg, is_training=False)
     test_loader = data.DataLoader(testset, batch_size=1,
                                        shuffle=False, num_workers=0,
