@@ -57,5 +57,5 @@ done
 
 /mnt/hdd1/sgh/MixNet/MixNet/model/240812_b2e_b2_g1_1024_filtered/MixNet_FSNet_M_1.pth
 
-python inference.py --exp_name 240830_bnk_w_2line --checkepoch 65 --num_workers 12 --infer_path "/mnt/hdd1/sgh/MixNet/MixNet/infer_test_datas/2line" --num_points 100 --test_size 2048 2048
+python inference.py --exp_name 240902_bnk_no_pretrained_mid --checkepoch 25 --num_workers 12 --infer_path "/mnt/hdd1/sgh/MixNet/MixNet/infer_test_datas/2line" --num_points 20 --test_size 2048 2048 --net FSNet_H_M
 
