@@ -84,11 +84,13 @@ class FSNet(nn.Module):
             nn.Conv2d(3, channels, 7, 2, 3, bias = False),
             # nn.BatchNorm2d(channels),
             nn.GroupNorm(1, channels),
-            nn.ReLU(True),
+            # nn.ReLU(True),
+            nn.SiLU(True),
             nn.Conv2d(channels, channels, 3, 1, 1, bias = False),
             # nn.BatchNorm2d(channels),
             nn.GroupNorm(1, channels),
-            nn.ReLU(True),
+            # nn.ReLU(True),
+            nn.SiLU(True),
         )
 
         for l in layers:
@@ -97,7 +99,8 @@ class FSNet(nn.Module):
                     nn.Conv2d(channels, channels, 3, 2, 1, bias = False),
                     # nn.BatchNorm2d(channels),
                     nn.GroupNorm(1 , channels),
-                    nn.ReLU(True),
+                    # nn.ReLU(True),
+                    nn.SiLU(True),
                 )
             )
             next_channels = self.channels * l

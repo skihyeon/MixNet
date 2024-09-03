@@ -31,9 +31,12 @@ class MultiHeadAttention(nn.Module):
         super(MultiHeadAttention, self).__init__()
         self.layer_norm = nn.LayerNorm(embed_dim)
         self.MultiheadAttention = nn.MultiheadAttention(embed_dim, num_heads, dropout=dropout, batch_first=batch_first)
-        self.Q_proj = nn.Sequential(nn.Linear(embed_dim, embed_dim), nn.ReLU())
-        self.K_proj = nn.Sequential(nn.Linear(embed_dim, embed_dim), nn.ReLU())
-        self.V_proj = nn.Sequential(nn.Linear(embed_dim, embed_dim), nn.ReLU())
+        # self.Q_proj = nn.Sequential(nn.Linear(embed_dim, embed_dim), nn.ReLU())
+        # self.K_proj = nn.Sequential(nn.Linear(embed_dim, embed_dim), nn.ReLU())
+        # self.V_proj = nn.Sequential(nn.Linear(embed_dim, embed_dim), nn.ReLU())
+        self.Q_proj = nn.Sequential(nn.Linear(embed_dim, embed_dim), nn.SiLU())
+        self.K_proj = nn.Sequential(nn.Linear(embed_dim, embed_dim), nn.SiLU())
+        self.V_proj = nn.Sequential(nn.Linear(embed_dim, embed_dim), nn.SiLU())
         self.if_resi = if_resi
 
     def forward(self, inputs):
@@ -57,7 +60,7 @@ class FeedForward(nn.Module):
         1024 2048
         """
         output_channel = (FFN_channel, in_channel)
-        self.fc1 = nn.Sequential(nn.Linear(in_channel, output_channel[0]), nn.ReLU())
+        self.fc1 = nn.Sequential(nn.Linear(in_channel, output_channel[0]), nn.SiLU())
         self.fc2 = nn.Linear(output_channel[0], output_channel[1])
         self.layer_norm = nn.LayerNorm(in_channel)
         self.if_resi = if_resi
@@ -117,10 +120,12 @@ class Transformer(nn.Module):
 
         self.prediction = nn.Sequential(
             nn.Conv1d(2*out_dim, 128, 1),
-            nn.ReLU(inplace=True),
+            # nn.ReLU(inplace=True),
+            nn.SiLU(True),
             nn.Dropout(0.1),
             nn.Conv1d(128, 64, 1),
-            nn.ReLU(inplace=True),
+            # nn.ReLU(inplace=True),
+            nn.SiLU(True),
             nn.Conv1d(64, pred_num, 1))
 
     def forward(self, x):

@@ -22,9 +22,11 @@ class UpBlok(nn.Module):
     def forward(self, upsampled, shortcut):
         x = torch.cat([upsampled, shortcut], dim=1)
         x = self.conv1x1(x)
-        x = F.relu(x)
+        # x = F.relu(x)
+        x = F.silu(x)
         x = self.conv3x3(x)
-        x = F.relu(x)
+        # x = F.relu(x)
+        x = F.silu(x)
         x = self.deconv(x)
         return x
 
@@ -37,7 +39,8 @@ class MergeBlok(nn.Module):
     def forward(self, upsampled, shortcut):
         x = torch.cat([upsampled, shortcut], dim=1)
         x = self.conv1x1(x)
-        x = F.relu(x)
+        # x = F.relu(x)
+        x = F.silu(x)
         x = self.conv3x3(x)
         return x
 
@@ -57,10 +60,12 @@ class reduceBlock(nn.Module):
     def forward(self, x):
         x = self.conv1x1(x)
         x = self.ln1(x)
-        x = F.relu(x)
+        # x = F.relu(x)
+        x = F.silu(x)
         x = self.conv3x3(x)
         x = self.ln2(x)
-        x = F.relu(x)
+        # x = F.relu(x)
+        x = F.silu(x)
         if self.deconv:
             x = self.deconv(x)
         return x
@@ -68,9 +73,11 @@ class reduceBlock(nn.Module):
 def horizonBlock(plane):
     return nn.Sequential(
         nn.Conv2d(plane, plane, (3,9), stride = 1, padding = (1,4)), # (3,15) 7
-        nn.ReLU(),
+        # nn.ReLU(),
+        nn.SiLU(),
         nn.Conv2d(plane, plane, (3,9), stride = 1, padding = (1,4)),
-        nn.ReLU() 
+        # nn.ReLU()
+        nn.SiLU()
     )
 
 class FPN(nn.Module):

@@ -132,9 +132,11 @@ class TextNet(nn.Module):
 
         self.seg_head = nn.Sequential(
             nn.Conv2d(32, 16, kernel_size=3, padding=2, dilation=2),
-            nn.PReLU(),
+            # nn.PReLU(),
+            nn.SiLU(),
             nn.Conv2d(16, 16, kernel_size=3, padding=4, dilation=4),
-            nn.PReLU(),
+            # nn.PReLU(),
+            nn.SiLU(),
             nn.Conv2d(16, 4, kernel_size=1, stride=1, padding=0),
         )
 

@@ -109,9 +109,6 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch):
     global train_step
 
     losses = AverageMeter()
-    batch_time = AverageMeter()
-    data_time = AverageMeter()
-    end = time.time()
     model.train()
 
     if accelerator:
@@ -120,6 +117,14 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch):
     else:
         print(f'Epoch: {epoch} : LR = {scheduler.get_lr()}')
     
+    ## for loss
+    cls_losses = AverageMeter()
+    distance_losses = AverageMeter()
+    direction_losses = AverageMeter()
+    norm_losses = AverageMeter()
+    angle_losses = AverageMeter()
+    point_losses = AverageMeter()
+    energy_losses = AverageMeter()
 
     # log 파일 경로 설정
     log_dir = os.path.join(cfg.save_dir, cfg.exp_name)
@@ -130,7 +135,6 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch):
     with open(log_path, 'a') as log_file:
         pbar = tqdm(train_loader, desc=f"Epoch {epoch}")
         for i, inputs in enumerate(pbar):
-            data_time.update(time.time() - end)
             train_step += 1
             input_dict = _parse_data(inputs)
 
@@ -152,9 +156,25 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch):
             scheduler.step()
 
             losses.update(loss.item())
+            
+            ## for logging ##
+            if not cfg.onlybackbone:
+                cls_loss = loss_dict["cls_loss"]
+                dis_loss = loss_dict["distance_loss"]
+                dir_loss = loss_dict["dir_loss"]
+                norm_loss = loss_dict["norm_loss"]
+                angle_loss = loss_dict["angle_loss"]
+                point_loss = loss_dict["point_loss"]
+                energy_loss = loss_dict["energy_loss"]
 
-            batch_time.update(time.time()-end)
-            end = time.time()
+                cls_losses.update(cls_loss.item())
+                distance_losses.update(dis_loss.item())
+                direction_losses.update(dir_loss.item())
+                norm_losses.update(norm_loss.item())
+                angle_losses.update(angle_loss.item())
+                point_losses.update(point_loss.item())
+                energy_losses.update(energy_loss.item())
+
 
             # 학습과정 visualization
             if cfg.viz and (i % cfg.viz_freq == 0 and i > 0):
@@ -168,11 +188,22 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch):
             log_file.write(f'Epoch: {epoch}, Step: {i}, Loss: {losses.avg:.2f}, Max Memory: {max_memory:.2f} MB\n')
             
             if accelerator.is_main_process and cfg.wandb:
-                wandb.log({
+                log_dict = {
                     "epoch": epoch,
                     "train_loss": losses.avg,
-                    "lr": scheduler.get_lr()[0]
-                })
+                    "lr": scheduler.get_last_lr()[0],
+                }
+                if cfg.onlybackbone == False:
+                    log_dict.update({   
+                        "losses/class_loss" : cls_losses.avg,
+                        "losses/distance_loss": distance_losses.avg,
+                        "losses/direction_loss": direction_losses.avg,
+                        "losses/norm_loss": norm_losses.avg,
+                        "losses/angle_loss": angle_losses.avg,
+                        "losses/point_loss": point_losses.avg,
+                        "losses/energy_loss": energy_losses.avg
+                    })
+                wandb.log(log_dict)
 
             # 메모리 정리
             del input_dict, output_dict, loss_dict, loss

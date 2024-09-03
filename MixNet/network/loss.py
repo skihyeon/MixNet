@@ -247,7 +247,7 @@ class TextLoss(nn.Module):
         loss_dict = {
             'total_loss': loss,
             'cls_loss': alpha*cls_loss,
-            'distance loss': beta*dis_loss,
+            'distance_loss': beta*dis_loss,
             'dir_loss': theta*(norm_loss + angle_loss),
             'norm_loss': theta*norm_loss,
             'angle_loss': theta*angle_loss,
