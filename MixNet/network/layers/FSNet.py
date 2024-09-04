@@ -12,11 +12,10 @@ class block(nn.Module):
         self.conv2 = nn.Conv2d(planes, planes, 3, 1, 1, bias = False)
         # self.bn2 = nn.BatchNorm2d(planes)
         self.ln2 = nn.GroupNorm(1, planes) 
-        self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.Mish(inplace=True)
         self.resid = None
         if inplanes != planes:
             self.resid = nn.Conv2d(inplanes, planes, 1, 1, 0, bias = False)
-
     def forward(self, x):
         residual = x.clone()
         if self.resid:

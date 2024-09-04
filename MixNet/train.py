@@ -104,8 +104,8 @@ def _parse_data(inputs):
     return input_dict
 
 def train(model, train_loader, criterion, scheduler, optimizer, epoch):
-    if cfg.wandb:
-        wandb.watch(model, criterion, log="all", log_freq=10)
+    # if cfg.wandb:
+        # wandb.watch(model, criterion, log="all", log_freq=10)
     global train_step
 
     losses = AverageMeter()
