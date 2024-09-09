@@ -275,11 +275,12 @@ def main():
         cudnn.benchmark = True
 
     for epoch in range(cfg.start_epoch, cfg.max_epoch+1):
-        model.train()  # 훈련 모드로 설정
+        model.train()  # Set to training mode
         train(model, train_loader, criterion, scheduler, optimizer, epoch)
-        if epoch > 0 and test_loader is not None:
-            model.eval()  # 평가 모드로 설정
-            inference(model, test_loader, criterion)
+        if epoch > 0 and testset is not None:
+            if len(test_loader) > 0:
+                model.eval()  # Set to evaluation mode
+                inference(model, test_loader, criterion)
         
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
