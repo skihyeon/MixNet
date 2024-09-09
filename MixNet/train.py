@@ -274,11 +274,11 @@ def main():
     trainset = AllDataset_mid(config=cfg, is_training=True) if cfg.mid else AllDataset(config=cfg, is_training=True)
     train_loader = data.DataLoader(trainset, batch_size=cfg.batch_size,
                                    shuffle=True, num_workers=cfg.num_workers,
-                                   pin_memory=True, generator=torch.Generator(device=cfg.device),)  # collate_fn 추가
+                                   pin_memory=True, generator=torch.Generator(device=cfg.device),persistent_workers=True,)  
     
     testset = AllDataset(config=cfg, is_training=False)
     test_loader = data.DataLoader(testset, batch_size=1,
-                                  shuffle=False, num_workers=0,)  # collate_fn 추가
+                                  shuffle=False, num_workers=0,pin_memory=True)  
 
     testset = AllDataset(config=cfg, is_training=False)
     test_loader = data.DataLoader(testset, batch_size=1,

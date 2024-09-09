@@ -53,23 +53,6 @@ def switchLayer(channels, xs):
 
     return xs
 
-# def switchLayer(channels, xs):
-#     numofeature = len(xs)
-#     outputs = []
-#     for i in range(numofeature):
-#         tmp = torch.zeros_like(xs[i])
-#         h,w = tmp.shape[2:]
-#         for j in range(numofeature):
-#             if j == i:
-#                 tmp[:,channels*j:channels*(j+1)] = xs[j][:,channels*i:channels*(i+1)]
-#             if j < i:
-#                 tmp[:,channels*j:channels*(j+1)] = F.avg_pool2d(xs[j][:,channels*i:channels*(i+1)], kernel_size = pow(2,(i-j)))
-#             if j > i:
-#                 tmp[:,channels*j:channels*(j+1)] = F.interpolate(xs[j][:,channels*i:channels*(i+1)], (h,w))
-#         outputs.append(tmp)
-
-#     return outputs
-
 class FSNet(nn.Module):
     def __init__(self, channels = 64, numofblocks = 4, layers = [1,2,3,4], dcn = False):
         super(FSNet, self).__init__()
@@ -80,12 +63,12 @@ class FSNet(nn.Module):
         self.steps = nn.ModuleList()
 
         self.stem = nn.Sequential(
-            nn.Conv2d(3, channels, 7, 2, 3, bias = False),
+            nn.Conv2d(3, channels, (7,11), 2, (3,5), bias = False),
             # nn.BatchNorm2d(channels),
             nn.GroupNorm(1, channels),
             # nn.ReLU(True),
             nn.Mish(True),
-            nn.Conv2d(channels, channels, 3, 1, 1, bias = False),
+            nn.Conv2d(channels, channels, (3,5), 1, (1,2), bias = False),
             # nn.BatchNorm2d(channels),
             nn.GroupNorm(1, channels),
             # nn.ReLU(True),
@@ -95,7 +78,7 @@ class FSNet(nn.Module):
         for l in layers:
             self.steps.append(
                 nn.Sequential(
-                    nn.Conv2d(channels, channels, 3, 2, 1, bias = False),
+                    nn.Conv2d(channels, channels, (3,5), 2, (1,2), bias = False),
                     # nn.BatchNorm2d(channels),
                     nn.GroupNorm(1 , channels),
                     # nn.ReLU(True),
