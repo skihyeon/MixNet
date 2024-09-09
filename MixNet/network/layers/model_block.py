@@ -46,20 +46,18 @@ class reduceBlock(nn.Module):
         super().__init__()
         self.conv1x1 = nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=1, padding=0, bias=False)
         self.conv3x3 = nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1, padding=1, bias=False)
-        # self.bn1 = nn.BatchNorm2d(out_channels)
-        # self.bn2 = nn.BatchNorm2d(out_channels)
-        self.ln1 = nn.GroupNorm(1, out_channels)  # LayerNorm 대신 GroupNorm 사용
-        self.ln2 = nn.GroupNorm(1, out_channels)
+        self.bn1 = nn.BatchNorm2d(out_channels)
+        self.bn2 = nn.BatchNorm2d(out_channels)
         if up:
             self.deconv = nn.ConvTranspose2d(out_channels, out_channels, kernel_size=4, stride=2, padding=1) 
         else:
             self.deconv = None
     def forward(self, x):
         x = self.conv1x1(x)
-        x = self.ln1(x)
+        x = self.bn1(x)
         x = F.relu(x)
         x = self.conv3x3(x)
-        x = self.ln2(x)
+        x = self.bn2(x)
         x = F.relu(x)
         if self.deconv:
             x = self.deconv(x)
@@ -82,7 +80,7 @@ class FPN(nn.Module):
         self.hor_block = False
 
         if backbone in ["FSNet_hor"]:
-            self.backbone = FSNet_M(pretrained=is_training)
+            self.backbone = FSNet_M()
             out_channels = self.backbone.channels * 4
             self.hor_block = True
             self.hors = nn.ModuleList()
@@ -92,21 +90,15 @@ class FPN(nn.Module):
             self.reduceLayer = reduceBlock(out_channels*4,32, up = True)
             self.skipfpn = True
 
-        elif backbone in ["FSNet_S"]:
-            self.backbone = FSNet_S(pretrained=is_training)
-            out_channels = self.backbone.channels * 4
-            self.upc1 = nn.ConvTranspose2d(32, 32, kernel_size=4, stride=2, padding=1)
-            self.reduceLayer = reduceBlock(out_channels*4,32, up = True)
-
         elif backbone in ["FSNet_M"]:
-            self.backbone = FSNet_M(pretrained=is_training)
+            self.backbone = FSNet_M()
             out_channels = self.backbone.channels * 4
             self.upc1 = nn.ConvTranspose2d(32, 32, kernel_size=4, stride=2, padding=1)
             self.reduceLayer = reduceBlock(out_channels*4,32, up = True)
             self.cbam_block = True
 
         elif backbone in ["FSNet_H_M"]:
-            self.backbone = FSNet_M(pretrained=is_training)
+            self.backbone = FSNet_M()
             out_channels = self.backbone.channels * 4
             self.hor_block = True
             self.hors = nn.ModuleList()
@@ -152,3 +144,5 @@ class FPN(nn.Module):
         del c4
         del c5
         return c1 
+
+

@@ -738,13 +738,13 @@ class Augmentation(object):
         self.std = std
         self._transform_dict = {'brightness': 0.3, 'contrast': 0.3, 'sharpness': 0.3, 'color': 0.3}
         self.augmentation = Compose([
-            RandomCropFlip(),
-            RandomResizeScale(size=self.size, ratio=(3. / 8, 5. / 2)),
-            RandomResizedCrop(),
-            RotatePadding(up=60, colors=False), 
+            # RandomCropFlip(),
+            # RandomResizeScale(size=self.size, ratio=(3. / 8, 5. / 2)),
+            # RandomResizedCrop(),
+            # RotatePadding(up=60, colors=False), 
             ResizeLimitSquare(size=self.size),
-            RandomMirror(),
-            RandomDistortion(self._transform_dict),
+            # RandomMirror(),
+            # RandomDistortion(self._transform_dict),
             # RandomRotation(),
             Normalize(mean=self.mean, std=self.std),
         ])

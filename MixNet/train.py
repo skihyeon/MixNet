@@ -277,7 +277,7 @@ def main():
     for epoch in range(cfg.start_epoch, cfg.max_epoch+1):
         model.train()  # 훈련 모드로 설정
         train(model, train_loader, criterion, scheduler, optimizer, epoch)
-        if epoch > 0:
+        if epoch > 0 and test_loader is not None:
             model.eval()  # 평가 모드로 설정
             inference(model, test_loader, criterion)
         
