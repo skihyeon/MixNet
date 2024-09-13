@@ -68,6 +68,8 @@ def hierarchical_custom_dataset(config, is_training, custom_data_root, select_da
     dataset_list = []
     if select_data == '/':
         folders_to_process = [f for f in os.listdir(custom_data_root) if os.path.isdir(os.path.join(custom_data_root, f))]
+    elif select_data == '.':
+        folders_to_process = []
     else:
         folders_to_process = select_data.split(',')
 

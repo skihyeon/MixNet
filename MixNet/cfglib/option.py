@@ -79,7 +79,7 @@ class BaseOptions(object):
         self.parser.add_argument('--select_open_data', default="totaltext,MSRA-TD500,ctw1500,FUNSD,XFUND,SROIE2019", type=str, help='select open data')
         self.parser.add_argument('--select_custom_data', default="kor_extended,bnk", type=str, help='select custom data')
         self.parser.add_argument('--wandb', action='store_true')
-        
+        self.parser.add_argument('--accumulation', default=0, type=int)
     def parse(self, fixed=None):
 
         if fixed is not None:

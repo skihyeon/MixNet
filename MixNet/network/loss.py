@@ -244,15 +244,28 @@ class TextLoss(nn.Module):
         if cfg.embed: # or cfg.mid:
             loss = loss + embed_ratio*embed_loss
 
-        loss_dict = {
-            'total_loss': loss,
+        loss_components = {
             'cls_loss': alpha*cls_loss,
             'distance_loss': beta*dis_loss,
-            'dir_loss': theta*(norm_loss + angle_loss),
             'norm_loss': theta*norm_loss,
             'angle_loss': theta*angle_loss,
             'point_loss': gama*point_loss,
             'energy_loss': gama*energy_loss,
+        }
+
+        for name, value in loss_components.items():
+            if not torch.isfinite(value):
+                print(f"Warning: {name} is not finite. Setting to 0.")
+                loss_components[name] = torch.tensor(0.0, device=value.device)
+
+        # 총 손실 계산
+        total_loss = sum(loss_components.values())
+        dir_loss = (loss_components['norm_loss'] + loss_components['angle_loss']) * theta
+        # loss_dict 생성
+        loss_dict = {
+            'total_loss': total_loss,
+            'dir_loss': dir_loss,
+            **loss_components
         }
 
         # loss_components = {

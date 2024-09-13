@@ -142,20 +142,34 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch):
             loss_dict = criterion(input_dict, output_dict)
             loss = loss_dict["total_loss"]
 
-            # optimizer.zero_grad()
-            model.zero_grad()
+            if cfg.accumulation > 0:
+                loss = loss / cfg.accumulation  # gradient accumulation step 8
+
+                # optimizer.zero_grad()는 gradient accumulation step 8마다 수행
+                if train_step % cfg.accumulation == 1:
+                    model.zero_grad()
+            else:
+                model.zero_grad()
+
             if accelerator:
                 accelerator.backward(loss)
             else:
                 loss.backward()
                                     
-            torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.grad_clip)
+            if cfg.accumulation:
+                if train_step % cfg.accumulation == 0:
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.grad_clip)
+                    optimizer.step()
+                    scheduler.step()
+            else:
+                torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.grad_clip)
+                optimizer.step()
+                scheduler.step()
 
-            
-            optimizer.step()
-            scheduler.step()
-
-            losses.update(loss.item())
+            if cfg.accumulation:
+                losses.update(loss.item() * cfg.accumulation)  # 원래 loss 값으로 업데이트
+            else:
+                losses.update(loss.item())
             
             ## for logging ##
             if not cfg.onlybackbone:
@@ -309,6 +323,16 @@ def main():
         model, optimizer, train_loader, criterion, scheduler = accelerator.prepare(model, optimizer, train_loader, criterion, scheduler)
     if cfg.cuda:
         cudnn.benchmark = True
+
+
+    if cfg.resume :
+        try:
+            start_iter = int(cfg.resume.split('_')[-1].split('.')[0]) + 1
+            print(f'continue to train, start_iter: {start_iter}')
+            cfg.start_epoch = start_iter 
+        except:
+            pass
+        
 
     for epoch in range(cfg.start_epoch, cfg.max_epoch+1):
         model.train()  # 훈련 모드로 설정
