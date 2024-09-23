@@ -78,8 +78,8 @@ def inference(model, image_path, output_dir):
     # print(f'{image_path} processing...', end='\r', flush=True)
     img_show = image.transpose(1, 2, 0)
     img_show = ((img_show * cfg.stds + cfg.means) * 255).astype(np.uint8)
-
-    show_boundary, heat_map = visualize_detection(img_show, output_dict, meta=meta, infer=True)
+    from util.visualize import visualize_detection_rect
+    show_boundary, heat_map = visualize_detection_rect(img_show, output_dict, meta=meta, infer=True)
 
     # im_vis = np.concatenate([heat_map, show_boundary], axis=1)
     im_vis = np.concatenate([show_boundary], axis=1)

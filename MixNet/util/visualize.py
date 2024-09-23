@@ -194,7 +194,62 @@ def visualize_detection(image, output_dict, meta=None, infer=None):
 
     return show_boundary, heat_map
 
+def visualize_detection_rect(image, output_dict, meta=None, infer=None):
+    image_show = image.copy()
+    image_show = np.ascontiguousarray(image_show[:, :, ::-1])
 
+    cls_preds = F.interpolate(output_dict["fy_preds"], scale_factor=cfg.scale, mode='bilinear')
+    cls_preds = cls_preds[0].data.cpu().numpy()
+
+    py_preds = output_dict["py_preds"][1:]
+    init_polys = output_dict["py_preds"][0]
+    shows = []
+
+    if cfg.mid:
+        midline = output_dict["midline"]
+
+    init_py = init_polys.data.cpu().numpy()
+    path = os.path.join(cfg.vis_dir, '{}_test'.format(cfg.exp_name),
+                        meta['image_id'][0].split(".")[0] + "_init.png")
+
+    im_show0 = image_show.copy()
+
+    for idx, py in enumerate(py_preds):
+        im_show = im_show0.copy()
+        contours = py.data.cpu().numpy()
+        for ppts in contours:
+            rect = cv2.minAreaRect(ppts.astype(np.int32))
+            box = cv2.boxPoints(rect)
+            box = np.int0(box)
+            cv2.drawContours(im_show, [box], 0, (0, 0, 255), 2)
+            for j, pp in enumerate(box):
+                if j == 0:
+                    cv2.circle(im_show, (int(pp[0]), int(pp[1])), 1, (0, 0, 255), -1)
+                elif j == 1:
+                    cv2.circle(im_show, (int(pp[0]), int(pp[1])), 1, (0, 0, 255), -1)
+                else:
+                    cv2.circle(im_show, (int(pp[0]), int(pp[1])), 1, (0, 0, 255), -1)
+        # if cfg.mid:
+        #     for ppt in midline:
+        #         for pt in ppt:
+        #             cv2.circle(im_show, (int(pt[0]), int(pt[1])), 3, (255, 0, 0), -1)
+
+        path = os.path.join(cfg.vis_dir, '{}_test'.format(cfg.exp_name),
+                             meta['image_id'][0].split(".")[0] + "_{}iter.png".format(idx))
+        # cv2.imwrite(path, im_show)
+        shows.append(im_show)
+
+    show_img = np.concatenate(shows, axis=1)
+    # show_boundary = cv2.resize(show_img, (320 * len(py_preds), 320))
+    show_boundary = show_img
+
+    cls_pred = cav.heatmap(np.array(cls_preds[0] * 255, dtype=np.uint8))
+    dis_pred = cav.heatmap(np.array(cls_preds[1] * 255, dtype=np.uint8))
+
+    heat_map = np.concatenate([cls_pred*255, dis_pred*255], axis=1)
+    # heat_map = cv2.resize(heat_map, (320 * 2, 320))
+
+    return show_boundary, heat_map
 
 def visualize_detection_backbone(image, output_dict, meta=None, infer=None):
     image_show = image.copy()
