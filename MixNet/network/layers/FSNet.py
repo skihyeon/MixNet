@@ -12,7 +12,7 @@ class block(nn.Module):
         self.conv2 = nn.Conv2d(planes, planes, 3, 1, 1, bias = False)
         # self.bn2 = nn.BatchNorm2d(planes)
         self.ln2 = nn.GroupNorm(1, planes) 
-        self.relu = nn.Mish(inplace=True)
+        self.relu = nn.SiLU(inplace=True)
         self.resid = None
         if inplanes != planes:
             self.resid = nn.Conv2d(inplanes, planes, 1, 1, 0, bias = False)
@@ -67,12 +67,12 @@ class FSNet(nn.Module):
             # nn.BatchNorm2d(channels),
             nn.GroupNorm(1, channels),
             # nn.ReLU(True),
-            nn.Mish(True),
+            nn.SiLU(True),
             nn.Conv2d(channels, channels, (3,5), 1, (1,2), bias = False),
             # nn.BatchNorm2d(channels),
             nn.GroupNorm(1, channels),
             # nn.ReLU(True),
-            nn.Mish(True),
+            nn.SiLU(True),
         )
 
         for l in layers:
@@ -82,7 +82,7 @@ class FSNet(nn.Module):
                     # nn.BatchNorm2d(channels),
                     nn.GroupNorm(1 , channels),
                     # nn.ReLU(True),
-                    nn.Mish(True),
+                    nn.SiLU(True),
                 )
             )
             next_channels = self.channels * l
