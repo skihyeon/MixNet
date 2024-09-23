@@ -731,6 +731,42 @@ class RandomDistortion(object):
         return np.array(out), target
 
 
+class SaltAndPepper(object):
+    def __init__(self, prob=0.5, noise_prob=0.04):
+        self.prob = prob
+        self.noise_prob = noise_prob
+
+    def __call__(self, img, target):
+        if random.random() > self.prob:
+            return img, target
+
+        output = np.copy(img)
+        noise_mask = np.random.choice([0, 1, 2], size=img.shape[:2], p=[1 - self.noise_prob, self.noise_prob / 2, self.noise_prob / 2])
+
+        output[noise_mask == 1] = 1  # 흰색 (normalize된 값)
+        output[noise_mask == 2] = -1  # 검은색 (normalize된 값)
+
+        return output, target
+
+
+class RandomDarken(object):
+    def __init__(self, prob=0.5):
+        self.prob = prob
+
+    def __call__(self, image, polygons=None):
+        if random.random() > self.prob:
+            return image, polygons
+
+        h, w, _ = image.shape
+        x1 = random.randint(0, w // 2)
+        y1 = random.randint(0, h // 2)
+        x2 = x1 + w // 2
+        y2 = y1 + h // 2
+
+        image[y1:y2, x1:x2] = image[y1:y2, x1:x2] * 0.5
+
+        return np.clip(image, 0, 255), polygons
+
 class Augmentation(object):
     def __init__(self, size, mean, std):
         self.size = size
@@ -738,15 +774,17 @@ class Augmentation(object):
         self.std = std
         self._transform_dict = {'brightness': 0.3, 'contrast': 0.3, 'sharpness': 0.3, 'color': 0.3}
         self.augmentation = Compose([
-            RandomCropFlip(),
-            RandomResizeScale(size=self.size, ratio=(3. / 8, 5. / 2)),
-            RandomResizedCrop(),
+            # RandomCropFlip(),
+            # RandomResizeScale(size=self.size, ratio=(3. / 8, 5. / 2)),
+            # RandomResizedCrop(),
             # RotatePadding(up=60, colors=False), 
             ResizeLimitSquare(size=self.size),
-            RandomMirror(),
-            RandomDistortion(self._transform_dict),
+            # RandomMirror(),
+            # RandomDistortion(self._transform_dict),
             # RandomRotation(),
             Normalize(mean=self.mean, std=self.std),
+            SaltAndPepper(),
+            RandomDarken()
         ])
 
     def __call__(self, image, polygons=None):
