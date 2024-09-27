@@ -131,31 +131,40 @@ class FPN(nn.Module):
             self.cbam3 = CBAM(out_channels, kernel_size = 7)
             self.cbam4 = CBAM(out_channels, kernel_size = 5)
             self.cbam5 = CBAM(out_channels, kernel_size = 3)
+        
+        self.conv_fusion = nn.Sequential(
+            nn.Conv2d(out_channels * 5, out_channels, kernel_size=1, bias=False),
+            nn.GroupNorm(1, out_channels),
+            nn.SiLU(True),
+        )
 
     def upsample(self, x, size):
         _,_,h,w = size
         return F.interpolate(x, size=(h, w), mode='bilinear')
 
     def forward(self, x):
-        c2,c3,c4,c5 = self.backbone(x)
-        if self.hor_block:
-            c2 = self.hors[0](c2)
-            c3 = self.hors[1](c3)
-            c4 = self.hors[2](c4)
-            c5 = self.hors[3](c5)
+        c1, c2, c3, c4, high_res = self.backbone(x)
+
         if self.cbam_block:
-            c2 = self.cbam2(c2)
-            c3 = self.cbam3(c3)
-            c4 = self.cbam4(c4)
-            c5 = self.cbam5(c5)
-        h,w = c2.shape[2:]
-        c3 = self.upsample(c3, size=c2.shape)
-        c4 = self.upsample(c4, size=c2.shape)
-        c5 = self.upsample(c5, size=c2.shape)
+            c1 = self.cbam2(c1)
+            c2 = self.cbam3(c2)
+            c3 = self.cbam4(c3)
+            c4 = self.cbam5(c4)
+
+        c2_up = F.interpolate(c2, size=c1.shape[2:], mode='bilinear', align_corners=True)
+        c3_up = F.interpolate(c3, size=c1.shape[2:], mode='bilinear', align_corners=True)
+        c4_up = F.interpolate(c4, size=c1.shape[2:], mode='bilinear', align_corners=True)
+
+        print(c1.shape)
+        print(c2_up.shape)
+        print(c3_up.shape)
+        print(c4_up.shape)
+        print(high_res.shape)
+        # 고해상도 피처와 결합
+        combined = torch.cat([c1, c2_up, c3_up, c4_up, high_res], dim=1)
+        print(combined.shape)
+        fused = self.conv_fusion(combined)
+
+        del c2_up, c3_up, c4_up, high_res, combined
+        return fused
         
-        c1 = self.upc1(self.reduceLayer(torch.cat([c2,c3,c4,c5], dim=1)))
-        del c2
-        del c3
-        del c4
-        del c5
-        return c1 

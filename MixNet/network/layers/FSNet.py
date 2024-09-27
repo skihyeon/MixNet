@@ -53,8 +53,12 @@ def switchLayer(channels, xs):
 
     return xs
 
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
 class FSNet(nn.Module):
-    def __init__(self, channels = 64, numofblocks = 4, layers = [1,2,3,4], dcn = False):
+    def __init__(self, channels=64, numofblocks=4, layers=[1,2,3,4], dcn=False):
         super(FSNet, self).__init__()
         self.channels = channels
         self.numofblocks = numofblocks
@@ -63,38 +67,39 @@ class FSNet(nn.Module):
         self.steps = nn.ModuleList()
 
         self.stem = nn.Sequential(
-            nn.Conv2d(3, channels, (7,11), 2, (3,5), bias = False),
-            # nn.BatchNorm2d(channels),
+            nn.Conv2d(3, channels, (7,11), 2, (3,5), bias=False),
             nn.GroupNorm(1, channels),
-            # nn.ReLU(True),
             nn.SiLU(True),
-            nn.Conv2d(channels, channels, (3,5), 1, (1,2), bias = False),
-            # nn.BatchNorm2d(channels),
+            nn.Conv2d(channels, channels, (3,5), 1, (1,2), bias=False),
             nn.GroupNorm(1, channels),
-            # nn.ReLU(True),
             nn.SiLU(True),
         )
 
         for l in layers:
             self.steps.append(
                 nn.Sequential(
-                    nn.Conv2d(channels, channels, (3,5), 2, (1,2), bias = False),
-                    # nn.BatchNorm2d(channels),
-                    nn.GroupNorm(1 , channels),
-                    # nn.ReLU(True),
+                    nn.Conv2d(channels, channels, (3,5), 2, (1,2), bias=False),
+                    nn.GroupNorm(1, channels),
                     nn.SiLU(True),
                 )
             )
             next_channels = self.channels * l
             for i in range(l):
-                tmp = [block(channels, next_channels, dcn = False)]
-                for j in range(self.numofblocks-1):
-                    tmp.append(block(next_channels, next_channels, dcn = dcn))
+                tmp = [block(channels, next_channels, dcn=False)]
+                for j in range(self.numofblocks - 1):
+                    tmp.append(block(next_channels, next_channels, dcn=dcn))
                 self.blocks.append(nn.Sequential(*tmp))
             channels = next_channels
 
+        # 추가: 고해상도 피처 처리를 위한 레이어
+        self.high_res_conv = nn.Sequential(
+            nn.Conv2d(256, 256, kernel_size=3, padding=1, bias=False),
+            nn.GroupNorm(1, 256),
+            nn.SiLU(True),
+        )
+
     def forward(self, x):
-        x = self.stem(x) # 64 > H/4, W/4
+        x = self.stem(x)  # 초기 피처 추출
         x1 = self.steps[0](x)
 
         x1 = self.blocks[0](x1)
@@ -103,20 +108,23 @@ class FSNet(nn.Module):
         x1 = self.blocks[1](x1)
         x2 = self.blocks[2](x2)
         x3 = self.steps[2](x2)
-        x1,x2 = switchLayer(self.channels, [x1,x2])
+        x1, x2 = switchLayer(self.channels, [x1, x2])
 
         x1 = self.blocks[3](x1)
         x2 = self.blocks[4](x2)
         x3 = self.blocks[5](x3)
         x4 = self.steps[3](x3)
-        x1,x2,x3 = switchLayer(self.channels, [x1,x2,x3])
+        x1, x2, x3 = switchLayer(self.channels, [x1, x2, x3])
 
         x1 = self.blocks[6](x1)
         x2 = self.blocks[7](x2)
         x3 = self.blocks[8](x3)
         x4 = self.blocks[9](x4)
 
-        return x1,x2,x3,x4
+        # 고해상도 피처 처리
+        high_res = self.high_res_conv(x1)
+
+        return x1, x2, x3, x4, high_res
 
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)

@@ -146,6 +146,13 @@ class TextNet(nn.Module):
             else:
                 self.BPN = Evolution(cfg.num_points, seg_channel=32+4, is_training=is_training, device=cfg.device)
 
+        self.multiscale_heads = nn.ModuleList([
+            nn.Conv2d(256, 32, kernel_size=3, padding=1),
+            nn.Conv2d(256, 32, kernel_size=3, padding=1),
+            nn.Conv2d(256, 32, kernel_size=3, padding=1),
+            nn.Conv2d(256, 32, kernel_size=3, padding=1)
+        ])
+
         print(f"Total MixNet with {self.backbone_name} parameter size: ", count_parameters(self))
         
     def train(self, mode=True):
@@ -175,15 +182,22 @@ class TextNet(nn.Module):
 
         up1 = self.fpn(image)
 
-        preds = self.seg_head(up1)
+        ms_features = []
+        for i, head in enumerate(self.multiscale_heads):
+            ms_feat = head(up1)
+            ms_features.append(ms_feat)
+
+        combined = sum(ms_features)
+
+        preds = self.seg_head(combined)
 
         fy_preds = torch.cat([torch.sigmoid(preds[:, 0:2, :, :]), preds[:, 2:4, :, :]], dim=1)
-
+        print(fy_preds.shape)
         if cfg.onlybackbone:
             output["fy_preds"] = fy_preds
             return output
 
-        cnn_feats = torch.cat([up1, fy_preds], dim=1)
+        cnn_feats = torch.cat([combined, fy_preds], dim=1)
         if cfg.mid:
             py_preds, inds, confidences, midline = self.BPN(cnn_feats, input=input_dict, seg_preds=fy_preds, switch="gt")
         else:
