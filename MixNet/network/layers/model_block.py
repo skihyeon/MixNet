@@ -143,28 +143,27 @@ class FPN(nn.Module):
         return F.interpolate(x, size=(h, w), mode='bilinear')
 
     def forward(self, x):
-        c1, c2, c3, c4, high_res = self.backbone(x)
-
+        c2, c3, c4, c5, high_res = self.backbone(x)
+        if self.hor_block:
+            c2 = self.hors[0](c2)
+            c3 = self.hors[1](c3)
+            c4 = self.hors[2](c4)
+            c5 = self.hors[3](c5)
         if self.cbam_block:
-            c1 = self.cbam2(c1)
-            c2 = self.cbam3(c2)
-            c3 = self.cbam4(c3)
-            c4 = self.cbam5(c4)
+            c2 = self.cbam2(c2)
+            c3 = self.cbam3(c3)
+            c4 = self.cbam4(c4)
+            c5 = self.cbam5(c5)
 
-        c2_up = F.interpolate(c2, size=c1.shape[2:], mode='bilinear', align_corners=True)
-        c3_up = F.interpolate(c3, size=c1.shape[2:], mode='bilinear', align_corners=True)
-        c4_up = F.interpolate(c4, size=c1.shape[2:], mode='bilinear', align_corners=True)
-
-        print(c1.shape)
-        print(c2_up.shape)
-        print(c3_up.shape)
-        print(c4_up.shape)
-        print(high_res.shape)
+        c3 = self.upsample(c3, size=c2.shape)
+        c4 = self.upsample(c4, size=c2.shape)
+        c5 = self.upsample(c5, size=c2.shape)
         # 고해상도 피처와 결합
-        combined = torch.cat([c1, c2_up, c3_up, c4_up, high_res], dim=1)
+        combined = torch.cat([c2, c3, c4, c5, high_res], dim=1) ## 1,1280,1280,1280
         print(combined.shape)
         fused = self.conv_fusion(combined)
+        print(fused.shape)
 
-        del c2_up, c3_up, c4_up, high_res, combined
+        del c2, c3, c4, c5, high_res, combined
         return fused
         
