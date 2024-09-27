@@ -294,11 +294,6 @@ def main():
     test_loader = data.DataLoader(testset, batch_size=1,
                                   shuffle=False, num_workers=0,pin_memory=True)  
 
-    testset = AllDataset(config=cfg, is_training=False)
-    test_loader = data.DataLoader(testset, batch_size=1,
-                                       shuffle=False, num_workers=0,
-                                       )
-
     model = TextNet(backbone=cfg.net, is_training=True)
 
     if cfg.resume:
