@@ -192,7 +192,7 @@ class TextNet(nn.Module):
         preds = self.seg_head(combined)
 
         fy_preds = torch.cat([torch.sigmoid(preds[:, 0:2, :, :]), preds[:, 2:4, :, :]], dim=1)
-        print(fy_preds.shape)
+
         if cfg.onlybackbone:
             output["fy_preds"] = fy_preds
             return output

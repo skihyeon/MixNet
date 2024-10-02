@@ -120,7 +120,7 @@ class FPN(nn.Module):
             for i in range(4):
                 self.hors.append(horizonBlock(out_channels))
             self.upc1 = nn.ConvTranspose2d(32, 32, kernel_size=4, stride=2, padding=1)
-            self.reduceLayer = reduceBlock(out_channels*4,32, up = True)
+            self.reduceLayer = reduceBlock(out_channels*5,32, up = True)
             self.cbam_block = True
 
         else:
@@ -133,7 +133,7 @@ class FPN(nn.Module):
             self.cbam5 = CBAM(out_channels, kernel_size = 3)
         
         self.conv_fusion = nn.Sequential(
-            nn.Conv2d(out_channels * 5, out_channels, kernel_size=1, bias=False),
+            nn.Conv2d(32, out_channels, kernel_size=1, bias=False),
             nn.GroupNorm(1, out_channels),
             nn.SiLU(True),
         )
@@ -159,10 +159,8 @@ class FPN(nn.Module):
         c4 = self.upsample(c4, size=c2.shape)
         c5 = self.upsample(c5, size=c2.shape)
         # 고해상도 피처와 결합
-        combined = torch.cat([c2, c3, c4, c5, high_res], dim=1) ## 1,1280,1280,1280
-        print(combined.shape)
+        combined = self.upc1(self.reduceLayer(torch.cat([c2, c3, c4, c5, high_res], dim=1))) ## 1,1280,1280,1280
         fused = self.conv_fusion(combined)
-        print(fused.shape)
 
         del c2, c3, c4, c5, high_res, combined
         return fused

@@ -38,7 +38,7 @@ def visualize_network_output(output_dict, input_dict, mode='train'):
 
     b, c, _, _ = fy_preds.shape
     for i in range(b):
-        fig = plt.figure(figsize=(48, 36))
+        fig = plt.figure(figsize=(36, 27))
 
         mask_pred = fy_preds[i, 0, :, :]
         distance_pred = fy_preds[i, 1, :, :]
@@ -104,7 +104,7 @@ def visualize_network_output(output_dict, input_dict, mode='train'):
             shows.append(image_show)
 
         for idx, im_show in enumerate(shows):
-            axb = fig.add_subplot(3, 5, 9+idx)
+            axb = fig.add_subplot(3, 4, 9+idx)
             im11 = axb.imshow(im_show, cmap=cm.jet)
 
         path = os.path.join(vis_dir, '{}.png'.format(i))
