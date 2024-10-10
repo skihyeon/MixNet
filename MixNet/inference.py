@@ -78,14 +78,15 @@ def inference(model, image_path, output_dir):
     # print(f'{image_path} processing...', end='\r', flush=True)
     img_show = image.transpose(1, 2, 0)
     img_show = ((img_show * cfg.stds + cfg.means) * 255).astype(np.uint8)
-
-    show_boundary, heat_map = visualize_detection(img_show, output_dict, meta=meta, infer=True)
+    from util.visualize import visualize_detection_rect
+    show_boundary, heat_map = visualize_detection_rect(img_show, output_dict, meta=meta, infer=True)
 
     # im_vis = np.concatenate([heat_map, show_boundary], axis=1)
     im_vis = np.concatenate([show_boundary], axis=1)
 
     _, im_buf_arr = cv2.imencode('.jpg', im_vis)    # 한글경로 인식 문제 해결
-    path = os.path.join(output_dir, os.path.basename(image_path).split(".")[0] + '_infered.jpg')
+    base_name = os.path.splitext(os.path.basename(image_path))[0]  # 파일 이름에 '.'이 여러개 들어있을 경우 마지막 확장자만 제거하도록 수정
+    path = os.path.join(output_dir, base_name + '_infered.jpg')
     with open(path, 'wb') as f:
         f.write(im_buf_arr)
 
@@ -99,7 +100,8 @@ def inference(model, image_path, output_dir):
     txt_folder = os.path.join(output_dir, 'text/')
     if not os.path.exists(txt_folder):
         os.makedirs(txt_folder)
-    fname = os.path.join(txt_folder, path.split('/')[-1].split(".")[0].replace('_infered', '') + '.txt')
+    base_fname = os.path.splitext(path.split('/')[-1])[0].replace('_infered', '')
+    fname = os.path.join(txt_folder, base_fname + '.txt')
 
     write_to_file(contours, fname)
     

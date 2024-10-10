@@ -120,7 +120,8 @@ def iou(det_x, det_y, gt_x, gt_y):
 def process_file(args):
     pred_path, gt_root, th = args
     preds = get_pred(pred_path)
-    gt_path = os.path.join(gt_root, pred_path.split('/')[-1].split('.')[0] + '.txt')
+    gt_base_name = os.path.splitext(os.path.basename(pred_path))[0]  # 파일 이름에 '.'이 여러개 들어있을 경우 마지막 확장자만 제거하도록 수정
+    gt_path = os.path.join(gt_root, gt_base_name + '.txt')
     gts, tags = get_gt(gt_path)
 
     ta = len(preds)
