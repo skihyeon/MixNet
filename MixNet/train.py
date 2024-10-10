@@ -292,7 +292,7 @@ def main():
     
     testset = AllDataset(config=cfg, is_training=False)
     test_loader = data.DataLoader(testset, batch_size=1,
-                                  shuffle=False, num_workers=0,pin_memory=True)  
+                                  shuffle=False, num_workers=0)  
 
     model = TextNet(backbone=cfg.net, is_training=True)
 
@@ -330,6 +330,9 @@ def main():
         
 
     for epoch in range(cfg.start_epoch, cfg.max_epoch+1):
+        if epoch == 0 :
+            model.eval()
+            inference(model, test_loader, criterion)
         model.train()  # 훈련 모드로 설정
         train(model, train_loader, criterion, scheduler, optimizer, epoch)
         if epoch > 0:
