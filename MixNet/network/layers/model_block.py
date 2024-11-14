@@ -92,16 +92,14 @@ class FPN(nn.Module):
     
         self.conv_fusion = nn.Sequential(
             nn.Conv2d(32, out_channels, kernel_size=1, bias=False),
-            nn.GroupNorm(out_channels//16, out_channels),  # 채널 수의 1/16로 그룹 설정
+            nn.GroupNorm(out_channels//16, out_channels),
             nn.SiLU(True),
         )
 
     def upsample(self, x, size):
         _,_,h,w = size
         return F.interpolate(x, size=(h, w), mode='bilinear')
-
     def forward(self, x):
-        # 백본 처리를 체크포인트로 감싸서 메모리 효율화
         def backbone_forward(x):
             c2, c3, c4, c5, high_res = self.backbone(x)
             
@@ -114,7 +112,7 @@ class FPN(nn.Module):
             c3 = self.cbam3(c3)
             c4 = self.cbam4(c4)
             c5 = self.cbam5(c5)
-            
+
             c3 = self.upsample(c3, size=c2.shape)
             c4 = self.upsample(c4, size=c2.shape)
             c5 = self.upsample(c5, size=c2.shape)
@@ -123,10 +121,11 @@ class FPN(nn.Module):
             
         c2, c3, c4, c5, high_res = checkpoint(backbone_forward, x)
 
-        # 피처 결합 및 최종 처리
         combined = self.upc1(self.reduceLayer(torch.cat([c2, c3, c4, c5, high_res], dim=1)))
+        
         del c2, c3, c4, c5, high_res
         torch.cuda.empty_cache()
+        
         
         x = self.conv_fusion[0](combined)
         del combined

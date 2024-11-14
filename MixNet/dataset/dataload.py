@@ -15,24 +15,24 @@ from util.misc import (
 
 
 def pil_load_img(path):
-    image = Image.open(path)
-    image = np.array(image)
-    return image
+    # 이미지 로딩 최적화
+    try:
+        image = np.array(Image.open(path))
+        if image.shape[-1] != 3:
+            raise ValueError
+        return image
+    except:
+        return cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB)
 
 
 class TextInstance(object):
     def __init__(self, points, orient, text):
         self.orient = orient
         self.text = text
-        self.bottoms = None
-        self.e1 = None
-        self.e2 = None
-        if self.text != "#":
-            self.label = 1
-        else:
-            self.label = -1
-
         self.points = np.array(points)
+        self.label = 1 if text != "#" else -1
+        self.bottoms = None
+        self.e1 = self.e2 = None
 
     def find_bottom_and_sideline(self):
         self.bottoms = find_bottom(self.points)  # find two bottoms of this Text
@@ -49,6 +49,7 @@ class TextInstance(object):
         n_disk = cfg.num_control_points // 2 - 1
         sideline1 = split_edge_seqence(self.points, self.e1, n_disk)
         sideline2 = split_edge_seqence(self.points, self.e2, n_disk)[::-1]
+        
         if sideline1[0][0] > sideline1[-1][0]:
             sideline1 = sideline1[::-1]
             sideline2 = sideline2[::-1]
@@ -82,7 +83,6 @@ class TextDataset(object):
         self.jitter = 0.65
         self.th_b = th_b
 
-
     @staticmethod
     def sigmoid_alpha(x, k):
         betak = (1 + np.exp(-k)) / (1 - np.exp(-k))
@@ -97,9 +97,7 @@ class TextDataset(object):
         contours, _ = cv2.findContours(text_mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         epsilon = approx_factor * cv2.arcLength(contours[0], True)
         approx = cv2.approxPolyDP(contours[0], epsilon, True).reshape((-1, 2))
-        ctrl_points = split_edge_seqence(approx, num_points)
-
-        ctrl_points = np.array(ctrl_points[:num_points, :]).astype(np.int32)
+        ctrl_points = np.array(split_edge_seqence(approx, num_points)[:num_points]).astype(np.int32)
 
         if jitter > 0:
             x_offset = (np.random.rand(ctrl_points.shape[0]) - 0.5) * distance*jitter
@@ -112,10 +110,7 @@ class TextDataset(object):
 
     @staticmethod
     def compute_direction_field(inst_mask, h, w):
-        _, labels = cv2.distanceTransformWithLabels(inst_mask, cv2.DIST_L2,
-                                                    cv2.DIST_MASK_PRECISE, labelType=cv2.DIST_LABEL_PIXEL)
-        
-        # # compute the direction field
+        _, labels = cv2.distanceTransformWithLabels(inst_mask, cv2.DIST_L2, cv2.DIST_MASK_PRECISE, labelType=cv2.DIST_LABEL_PIXEL)
         index = np.copy(labels)
         index[inst_mask > 0] = 0
         place = np.argwhere(index > 0)
@@ -141,7 +136,6 @@ class TextDataset(object):
         direction_field = np.zeros((2, h, w), dtype=np.float32)
         distance_field = np.zeros((h, w), dtype=np.float32)
         edge_field = np.zeros((h, w), dtype=np.uint8)
-
         gt_points = np.zeros((cfg.max_annotation, cfg.num_points, 2), dtype=np.float32)
         proposal_points = np.zeros((cfg.max_annotation, cfg.num_points, 2), dtype=np.float32)
         ignore_tags = np.zeros((cfg.max_annotation,), dtype=np.int32)
@@ -181,7 +175,6 @@ class TextDataset(object):
             diff = self.compute_direction_field(inst_mask, h, w)
             direction_field[:, inst_mask > 0] = diff[:, inst_mask > 0]
 
-        # ### background ######
         weight_matrix[tr_mask == 0] = 1. / np.sqrt(np.sum(tr_mask == 0))
         train_mask = np.clip(train_mask, 0, 1)
         distance_field = np.clip(distance_field, 0, 1)
@@ -196,9 +189,7 @@ class TextDataset(object):
             #image, polygons = self.transform(image, polygons)
             image, polygons = self.transform(copy.deepcopy(image), copy.deepcopy(polygons))
 
-        train_mask, tr_mask, \
-        distance_field, direction_field, \
-        weight_matrix, gt_points, proposal_points, ignore_tags, edge_field = self.make_text_region(image, polygons)
+        train_mask, tr_mask, distance_field, direction_field, weight_matrix, gt_points, proposal_points, ignore_tags, edge_field = self.make_text_region(image, polygons)
 
         # # to pytorch channel sequence
         image = image.transpose(2, 0, 1)
@@ -218,7 +209,7 @@ class TextDataset(object):
                direction_field, weight_matrix, gt_points, proposal_points, ignore_tags, edge_field
 
     def get_test_data(self, image, polygons=None, image_id=None, image_path=None):
-        H, W, _ = image.shape
+        H, W = image.shape[:2]
         if self.transform:
             image, polygons = self.transform(image, polygons)
 
@@ -235,10 +226,7 @@ class TextDataset(object):
                     break
                 points[i, :pts.shape[0]] = polygon.points
                 length[i] = pts.shape[0]
-                if polygon.text != '#':
-                    label_tag[i] = 1
-                else:
-                    label_tag[i] = -1
+                label_tag[i] = 1 if polygon.text != '#' else -1
 
         meta = {
             'image_id': image_id,
@@ -257,5 +245,3 @@ class TextDataset(object):
 
     def __len__(self):
         raise NotImplementedError()
-
-

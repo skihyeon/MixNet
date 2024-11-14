@@ -5,6 +5,7 @@ import numpy as np
 from dataset.dataload import pil_load_img, TextDataset, TextInstance
 import json
 import cv2
+from functools import lru_cache
 
 def get_absolute_path(p):
     if p.startswith('~'):
@@ -13,15 +14,14 @@ def get_absolute_path(p):
 
 def read_lines(p):
     p = get_absolute_path(p)
-    f = open(p,'rU')
-    return f.readlines()
-
+    with open(p,'rU') as f:
+        return f.readlines()
 
 class myDataset(TextDataset):
     def __init__(self, data_root, is_training=True, load_memory=False, transform=None):
         super().__init__(transform, is_training)
         self.data_root = data_root
-        self.is_training = is_training
+        self.is_training = is_training 
         self.load_memory = load_memory
 
         self.image_root = os.path.join(data_root, 'Train' if is_training else 'Test', 'images')
@@ -29,14 +29,22 @@ class myDataset(TextDataset):
         self.image_list = os.listdir(self.image_root)
         self.annotation_list = [os.path.join(self.annotation_root, img + '.json') for img in self.image_list]
 
+        # JSON 데이터 캐싱
+        self.json_cache = {}
+        
         if self.load_memory:
-            self.datas = list()
+            self.datas = []
             for item in range(len(self.image_list)):
                 self.datas.append(self.load_img_gt(item))
 
+    @lru_cache(maxsize=128)
     def parse_json(self, gt_path):
-        with open(gt_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
+        if gt_path in self.json_cache:
+            data = self.json_cache[gt_path]
+        else:
+            with open(gt_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                self.json_cache[gt_path] = data
 
         polygons = []
         if 'images' in data and data['images']:
@@ -60,52 +68,42 @@ class myDataset(TextDataset):
     def make_txt(self, gt_path, polygons):
         txt_path = gt_path.replace('.json', '').replace('.jpg', '').replace('.jpeg', '').replace('.png', '').replace('.PNG', '').replace('.JPG', '').replace('JPEG', '') + '.txt'
         if not os.path.exists(txt_path):
+            os.makedirs(os.path.dirname(txt_path), exist_ok=True)
             with open(txt_path, 'w', encoding='utf-8') as f:
                 for poly in polygons:
                     points = poly.points.flatten()
                     points_str = ','.join(map(str, points))
                     f.write(f"{points_str},{poly.label}\n")
 
-
     def load_img_gt(self, item):
         image_path = os.path.join(self.image_root, self.image_list[item])
-        if os.name == 'nt':  # 윈도우일 경우
-            image_id = image_path.split("\\")[-1]
-        else:  # 리눅스일 경우
-            image_id = image_path.split("/")[-1]
+        image_id = os.path.basename(image_path)
 
+        # 이미지 로딩 최적화
         image = pil_load_img(image_path)
-        try:
-            assert image.shape[-1] == 3
-        except:
-            image = cv2.imread(image_path)
-            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-            image = np.array(image)
+        if image.shape[-1] != 3:
+            image = cv2.cvtColor(cv2.imread(image_path), cv2.COLOR_BGR2RGB)
 
         annotation_path = self.annotation_list[item]
         polygons = self.parse_json(annotation_path)
         self.make_txt(annotation_path, polygons)
 
-        data = dict()
-        data["image"] = image
-        data["polygons"] = polygons
-        data["image_id"] = image_id
-        data["image_path"] = image_path
-
-        return data
+        return {
+            "image": image,
+            "polygons": polygons,
+            "image_id": image_id,
+            "image_path": image_path
+        }
 
     def __getitem__(self, item):
-        if self.load_memory:
-            data = self.datas[item]
-        else:
-            data = self.load_img_gt(item)
+        data = self.datas[item] if self.load_memory else self.load_img_gt(item)
 
         if self.is_training:
             return self.get_training_data(data["image"], data["polygons"],
-                                          image_id=data["image_id"], image_path=data["image_path"])
+                                        image_id=data["image_id"], image_path=data["image_path"])
         else:
             return self.get_test_data(data["image"], data["polygons"],
-                                      image_id=data["image_id"], image_path=data["image_path"])
+                                    image_id=data["image_id"], image_path=data["image_path"])
 
     def __len__(self):
         return len(self.image_list)
