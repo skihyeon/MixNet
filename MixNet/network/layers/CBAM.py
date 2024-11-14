@@ -10,7 +10,7 @@ class ChannelAttention(nn.Module):
         self.fc = nn.Sequential(
             nn.Conv2d(in_planes, in_planes // ratio, 1, bias=False),
             # nn.ReLU(),
-            nn.SiLU(),
+            nn.SiLU(True),
             nn.Conv2d(in_planes // ratio, in_planes, 1, bias=False))
         self.sigmoid = nn.Sigmoid()
 

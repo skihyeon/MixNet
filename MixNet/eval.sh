@@ -55,5 +55,9 @@ do
     python cal_IoU.py --pred_root ./output/$exp_name --gt_root ./data/open_datas/gts >> iou.log
 done
 
-CUDA_VISIBLE_DEVICES=3 python inference.py --exp_name 241008_multiscalehead_1024_a8 --checkepoch 55 --num_workers 12 --infer_path "/mnt/hdd1/sgh/MixNet/MixNet/infer_test_datas/images_bnk" --num_points 20 --test_size 2048 2048 --net FSNet_H_M 
+CUDA_VISIBLE_DEVICES=3 python inference.py --exp_name 240716_bnk_from_onlykor_mid --checkepoch 285 --num_workers 12 --infer_path "/mnt/hdd1/sgh/MixNet/MixNet/infer_test_datas/bnk_low_241011" --num_points 20 --test_size 2048 2048 --net FSNet_H_M --mid True
+CUDA_VISIBLE_DEVICES=3 python inference.py --exp_name 240716_bnk_from_onlykor_mid --checkepoch 285 --num_workers 12 --infer_path "/mnt/hdd1/sgh/MixNet/MixNet/infer_test_datas/bnk_low" --num_points 20 --test_size 2048 2048 --net FSNet_H_M --mid True
 
+
+
+CUDA_VISIBLE_DEVICES=3 python inference.py --exp_name 241010_multiscalehead_1024_CustomAll --checkepoch 55 --num_workers 12 --infer_path "/mnt/hdd1/sgh/MixNet/MixNet/infer_test_datas/241031" --num_points 20 --test_size 2048 2048 --net FSNet_H_M

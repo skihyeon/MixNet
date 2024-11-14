@@ -8,10 +8,10 @@ class block(nn.Module):
         self.dcn = dcn
         self.conv1 = nn.Conv2d(inplanes, planes, 3, 1, 1, bias = False)
         # self.bn1 = nn.BatchNorm2d(planes)
-        self.ln1 = nn.GroupNorm(1, planes)
+        self.ln1 = nn.GroupNorm(planes//16, planes)
         self.conv2 = nn.Conv2d(planes, planes, 3, 1, 1, bias = False)
         # self.bn2 = nn.BatchNorm2d(planes)
-        self.ln2 = nn.GroupNorm(1, planes) 
+        self.ln2 = nn.GroupNorm(planes//16, planes) 
         self.relu = nn.SiLU(inplace=True)
         self.resid = None
         if inplanes != planes:
@@ -68,10 +68,10 @@ class FSNet(nn.Module):
 
         self.stem = nn.Sequential(
             nn.Conv2d(3, channels, (7,11), 2, (3,5), bias=False),
-            nn.GroupNorm(1, channels),
+            nn.GroupNorm(channels//16, channels),
             nn.SiLU(True),
             nn.Conv2d(channels, channels, (3,5), 1, (1,2), bias=False),
-            nn.GroupNorm(1, channels),
+            nn.GroupNorm(channels//16, channels),
             nn.SiLU(True),
         )
 
@@ -79,7 +79,7 @@ class FSNet(nn.Module):
             self.steps.append(
                 nn.Sequential(
                     nn.Conv2d(channels, channels, (3,5), 2, (1,2), bias=False),
-                    nn.GroupNorm(1, channels),
+                    nn.GroupNorm(channels//16, channels),
                     nn.SiLU(True),
                 )
             )
@@ -94,7 +94,7 @@ class FSNet(nn.Module):
         # 추가: 고해상도 피처 처리를 위한 레이어
         self.high_res_conv = nn.Sequential(
             nn.Conv2d(256, 256, kernel_size=3, padding=1, bias=False),
-            nn.GroupNorm(1, 256),
+            nn.GroupNorm(256//16, 256),
             nn.SiLU(True),
         )
 
@@ -129,47 +129,3 @@ class FSNet(nn.Module):
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
-# def FSNet_M(pretrained = True):
-#     model = FSNet()
-#     print("MixNet backbone parameter size: ", count_parameters(model))
-#     if pretrained:
-#         load_path = "./model/240805_pretrain_backbone/MixNet_FSNet_M_20.pth"
-#         cpt = torch.load(load_path)
-        
-#         # 키 이름에서 'fpn.backbone.' 접두사 제거
-#         new_state_dict = {k.replace('fpn.backbone.', ''): v for k, v in cpt['model'].items()}
-#         model.load_state_dict(new_state_dict, strict=True)
-#         print("load pretrain weight from {}. ".format(load_path))
-#         # print("mixHRnet does not have pretrained weight yet. ")
-#     return model
-
-import os
-
-def FSNet_M(pretrained = True):
-    model = FSNet()
-    print("MixNet backbone parameter size: ", count_parameters(model))
-    if pretrained:
-        # load_path = "/mnt/hdd1/sgh/MixNet/MixNet/model/240808_pretrain_backbone_b2/MixNet_FSNet_M_40.pth"
-        # # load_path = ""
-        # if os.path.exists(load_path):
-        #     cpt = torch.load(load_path)
-            
-        #     # FSNet에 해당하는 키만 선택
-        #     new_state_dict = {}
-        #     for k, v in cpt['model'].items():
-        #         if k.startswith('fpn.backbone.'):
-        #             new_key = k.replace('fpn.backbone.', '')
-        #             if new_key in model.state_dict():
-        #                 new_state_dict[new_key] = v
-            
-        #     # 수정된 state_dict로 모델 로드
-        #     model.load_state_dict(new_state_dict, strict=False)
-        #     print("load pretrain weight from {}. ".format(load_path))
-        # else:
-        #     print("No pretrained weight")
-        # print("Loaded keys:", len(new_state_dict))
-        # print("Total model keys:", len(model.state_dict()))
-        print("No pretrained weight")
-    else:
-        print("pretraine execute")
-    return model

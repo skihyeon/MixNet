@@ -133,7 +133,10 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch):
         mkdirs(log_dir)
 
     with open(log_path, 'a') as log_file:
-        pbar = tqdm(train_loader, desc=f"Epoch {epoch}")
+        if accelerator.is_main_process:
+            pbar = tqdm(train_loader, desc=f"Epoch {epoch}")
+        else:
+            pbar = train_loader
         for i, inputs in enumerate(pbar):
             train_step += 1
             input_dict = _parse_data(inputs)
@@ -196,10 +199,12 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch):
 
             max_memory = torch.cuda.max_memory_allocated() / 1024 / 1024
 
-            pbar.set_postfix({'Training Loss': f'{losses.avg:.2f}', 'Max Memory': f'{max_memory:.2f} MB'})
+            if accelerator.is_main_process:
+                pbar.set_postfix({'Training Loss': f'{losses.avg:.2f}', 'Max Memory': f'{max_memory:.2f} MB'})
 
             # 로그 파일에 학습 정보 저장
-            log_file.write(f'Epoch: {epoch}, Step: {i}, Loss: {losses.avg:.2f}, Max Memory: {max_memory:.2f} MB\n')
+            if accelerator.is_main_process:
+                log_file.write(f'Epoch: {epoch}, Step: {i}, Loss: {losses.avg:.2f}, Max Memory: {max_memory:.2f} MB\n')
             
             if accelerator.is_main_process and cfg.wandb:
                 log_dict = {
@@ -229,7 +234,10 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch):
 
 def inference(model, test_loader, criterion):
     model.eval()
-    pbar = tqdm(test_loader, desc="Valid")
+    if accelerator.is_main_process:
+        pbar = tqdm(test_loader, desc="Valid")
+    else:
+        pbar = test_loader
     total_hit_rate = 0
     total_precision = 0
     total_recall = 0
@@ -262,7 +270,8 @@ def inference(model, test_loader, criterion):
         total_recall += recall
         total_hmean += hmean
         num_images += 1
-        pbar.set_postfix({'hr': f'{hit_rate}', "f1": f'{precision:.2f}/{recall:.2f}/{hmean:.2f}'})
+        if accelerator.is_main_process:
+            pbar.set_postfix({'hr': f'{hit_rate}', "f1": f'{precision:.2f}/{recall:.2f}/{hmean:.2f}'})
 
     avg_hit_rate = total_hit_rate / num_images
     avg_precision = total_precision / num_images
@@ -330,9 +339,9 @@ def main():
         
 
     for epoch in range(cfg.start_epoch, cfg.max_epoch+1):
-        if epoch == 0 :
-            model.eval()
-            inference(model, test_loader, criterion)
+        # if epoch == 0 :
+        #     model.eval()
+        #     inference(model, test_loader, criterion)
         model.train()  # 훈련 모드로 설정
         train(model, train_loader, criterion, scheduler, optimizer, epoch)
         if epoch > 0:

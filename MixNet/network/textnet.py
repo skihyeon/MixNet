@@ -9,7 +9,6 @@ from network.layers.model_block import FPN
 from network.layers.Transformer import Transformer
 from network.layers.gcn_utils import get_node_feature
 from util.misc import get_sample_point
-from .midline import midlinePredictor
 
 class Evolution(nn.Module):
     def __init__(self, node_num, seg_channel, is_training=True, device=None):
@@ -124,27 +123,23 @@ def count_parameters(model):
 
 
 class TextNet(nn.Module):
-    def __init__(self, backbone='vgg', is_training=True):
+    def __init__(self, backbone, is_training=True):
         super().__init__()
         self.is_training = is_training
         self.backbone_name = backbone
-        self.fpn = FPN(self.backbone_name, is_training=(not cfg.resume and is_training and not cfg.onlybackbone))
+        self.fpn = FPN()
 
         self.seg_head = nn.Sequential(
             nn.Conv2d(32, 16, kernel_size=3, padding=2, dilation=2),
             # nn.PReLU(),
-            nn.SiLU(),
+            nn.SiLU(True),
             nn.Conv2d(16, 16, kernel_size=3, padding=4, dilation=4),
             # nn.PReLU(),
-            nn.SiLU(),
+            nn.SiLU(True),
             nn.Conv2d(16, 4, kernel_size=1, stride=1, padding=0),
         )
 
-        if not cfg.onlybackbone:
-            if cfg.mid:
-                self.BPN = midlinePredictor(seg_channel=32+4, is_training=is_training)
-            else:
-                self.BPN = Evolution(cfg.num_points, seg_channel=32+4, is_training=is_training, device=cfg.device)
+        self.BPN = Evolution(cfg.num_points, seg_channel=32+4, is_training=is_training, device=cfg.device)
 
         self.multiscale_heads = nn.ModuleList([
             nn.Conv2d(256, 32, kernel_size=3, padding=1),
@@ -170,7 +165,7 @@ class TextNet(nn.Module):
         state_dict = torch.load(model_path, map_location=torch.device(cfg.device))
         self.load_state_dict(state_dict['model'], strict=(not self.is_training))
 
-    def forward(self, input_dict, test_speed=False, knowledge = False):
+    def forward(self, input_dict, test_speed=False):
         output = {}
         b, c, h, w = input_dict["img"].shape
         # print(b,c,h,w)
@@ -181,34 +176,20 @@ class TextNet(nn.Module):
             image[:, :, :h, :w] = input_dict["img"][:, :, :, :]
 
         up1 = self.fpn(image)
-
-        ms_features = []
-        for i, head in enumerate(self.multiscale_heads):
-            ms_feat = head(up1)
-            ms_features.append(ms_feat)
-
-        combined = sum(ms_features)
+        combined = sum(head(up1) for head in self.multiscale_heads)
 
         preds = self.seg_head(combined)
 
         fy_preds = torch.cat([torch.sigmoid(preds[:, 0:2, :, :]), preds[:, 2:4, :, :]], dim=1)
 
-        if cfg.onlybackbone:
-            output["fy_preds"] = fy_preds
-            return output
-
         cnn_feats = torch.cat([combined, fy_preds], dim=1)
-        if cfg.mid:
-            py_preds, inds, confidences, midline = self.BPN(cnn_feats, input=input_dict, seg_preds=fy_preds, switch="gt")
-        else:
-            py_preds, inds, confidences = self.BPN(cnn_feats, input=input_dict, seg_preds=fy_preds, switch="gt")
+
+        py_preds, inds, confidences = self.BPN(cnn_feats, input=input_dict, seg_preds=fy_preds, switch="gt")
         
         output["fy_preds"] = fy_preds
         output["py_preds"] = py_preds
         output["inds"] = inds
         output["confidences"] = confidences
-        if cfg.mid:
-            output["midline"] = midline
 
         # print(py_preds)
         return output
