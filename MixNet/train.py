@@ -28,6 +28,16 @@ accelerator = Accelerator(kwargs_handlers=[kwargs])
 # accelerator = Accelerator()
 train_step = 0
 
+# 시간 측정을 위한 클래스 정의
+class TimeMeter:
+    def __init__(self):
+        self.reset()
+        
+    def reset(self):
+        self.data_time = AverageMeter()
+        self.forward_time = AverageMeter() 
+        self.backward_time = AverageMeter()
+        self.batch_time = AverageMeter()
 
 def init_wandb(cfg):
     wandb.login(key=os.environ.get("WANDB_API_KEY"))
@@ -104,12 +114,11 @@ def _parse_data(inputs):
     return input_dict
 
 def train(model, train_loader, criterion, scheduler, optimizer, epoch):
-    # if cfg.wandb:
-        # wandb.watch(model, criterion, log="all", log_freq=10)
     global train_step
 
     losses = AverageMeter()
     model.train()
+    time_meter = TimeMeter()
 
     if accelerator:
         if accelerator.is_main_process:
@@ -139,12 +148,25 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch):
             pbar = train_loader
         for i, inputs in enumerate(pbar):
             train_step += 1
+            
+            batch_start = time.time()
+            
+            # 데이터 로딩 시간 측정
+            data_start = time.time()
             input_dict = _parse_data(inputs)
+            data_time = time.time() - data_start
+            time_meter.data_time.update(data_time)
 
+            # Forward 시간 측정
+            forward_start = time.time()
             output_dict = model(input_dict)
             loss_dict = criterion(input_dict, output_dict)
             loss = loss_dict["total_loss"]
+            forward_time = time.time() - forward_start
+            time_meter.forward_time.update(forward_time)
 
+            # Backward 시간 측정
+            backward_start = time.time()
             if cfg.accumulation > 0:
                 loss = loss / cfg.accumulation  # gradient accumulation step 8
 
@@ -168,6 +190,13 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch):
                 torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.grad_clip)
                 optimizer.step()
                 scheduler.step()
+                
+            backward_time = time.time() - backward_start
+            time_meter.backward_time.update(backward_time)
+            
+            # 전체 배치 시간 측정
+            batch_time = time.time() - batch_start
+            time_meter.batch_time.update(batch_time)
 
             if cfg.accumulation:
                 losses.update(loss.item() * cfg.accumulation)  # 원래 loss 값으로 업데이트
@@ -175,32 +204,39 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch):
                 losses.update(loss.item())
             
             ## for logging ##
-            if not cfg.onlybackbone:
-                cls_loss = loss_dict["cls_loss"]
-                dis_loss = loss_dict["distance_loss"]
-                dir_loss = loss_dict["dir_loss"]
-                norm_loss = loss_dict["norm_loss"]
-                angle_loss = loss_dict["angle_loss"]
-                point_loss = loss_dict["point_loss"]
-                energy_loss = loss_dict["energy_loss"]
+            cls_loss = loss_dict["cls_loss"]
+            dis_loss = loss_dict["distance_loss"]
+            dir_loss = loss_dict["dir_loss"]
+            norm_loss = loss_dict["norm_loss"]
+            angle_loss = loss_dict["angle_loss"]
+            point_loss = loss_dict["point_loss"]
+            energy_loss = loss_dict["energy_loss"]
 
-                cls_losses.update(cls_loss.item())
-                distance_losses.update(dis_loss.item())
-                direction_losses.update(dir_loss.item())
-                norm_losses.update(norm_loss.item())
-                angle_losses.update(angle_loss.item())
-                point_losses.update(point_loss.item())
-                energy_losses.update(energy_loss.item())
-
+            cls_losses.update(cls_loss.item())
+            distance_losses.update(dis_loss.item())
+            direction_losses.update(dir_loss.item())
+            norm_losses.update(norm_loss.item())
+            angle_losses.update(angle_loss.item())
+            point_losses.update(point_loss.item())
+            energy_losses.update(energy_loss.item())
 
             # 학습과정 visualization
             if cfg.viz and (i % cfg.viz_freq == 0 and i > 0):
                 visualize_network_output(output_dict, input_dict, mode='train')
 
             max_memory = torch.cuda.max_memory_allocated() / 1024 / 1024
-
+            
+            # 시간 측정 결과 출력
+            time_info = {
+                # 'Data Time': f'{time_meter.data_time.avg:.2f}s',
+                'Forward': f'{time_meter.forward_time.avg:.2f}s',
+                'Back': f'{time_meter.backward_time.avg:.2f}s',
+                # 'Batch Time': f'{time_meter.batch_time.avg:.2f}s'
+            }
+            
             if accelerator.is_main_process:
-                pbar.set_postfix({'Training Loss': f'{losses.avg:.2f}', 'Max Memory': f'{max_memory:.2f} MB'})
+                pbar.set_postfix({'Training Loss': f'{losses.avg:.2f}, time: {time_info}', 'Max Memory': f'{max_memory:.2f} MB'})
+                # pbar.set_postfix(time_info)
 
             # 로그 파일에 학습 정보 저장
             if accelerator.is_main_process:
@@ -228,12 +264,14 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch):
             del input_dict, output_dict, loss_dict, loss
             torch.cuda.empty_cache()
             gc.collect()
+            
     if epoch % cfg.save_freq == 0:
         save_model(model, epoch, scheduler.get_lr())
 
 
 def inference(model, test_loader, criterion):
     model.eval()
+    torch.cuda.reset_max_memory_allocated()
     if accelerator.is_main_process:
         pbar = tqdm(test_loader, desc="Valid")
     else:
@@ -270,8 +308,10 @@ def inference(model, test_loader, criterion):
         total_recall += recall
         total_hmean += hmean
         num_images += 1
+
+        max_memory = torch.cuda.max_memory_allocated() / 1024 / 1024
         if accelerator.is_main_process:
-            pbar.set_postfix({'hr': f'{hit_rate}', "f1": f'{precision:.2f}/{recall:.2f}/{hmean:.2f}'})
+            pbar.set_postfix({'hr': f'{hit_rate}', "f1": f'{precision:.2f}/{recall:.2f}/{hmean:.2f}', 'Max Memory': f'{max_memory:.2f} MB'})
 
     avg_hit_rate = total_hit_rate / num_images
     avg_precision = total_precision / num_images
@@ -344,9 +384,9 @@ def main():
         #     inference(model, test_loader, criterion)
         model.train()  # 훈련 모드로 설정
         train(model, train_loader, criterion, scheduler, optimizer, epoch)
-        if epoch > 0:
-            model.eval()  # 평가 모드로 설정
-            inference(model, test_loader, criterion)
+        # if epoch > 0:
+        model.eval()  # 평가 모드로 설정
+        inference(model, test_loader, criterion)
         
     if torch.cuda.is_available():
         torch.cuda.empty_cache()

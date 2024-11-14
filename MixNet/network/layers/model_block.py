@@ -5,133 +5,105 @@ import torch.nn.functional as F
 from .FSNet import FSNet
 from .CBAM import CBAM
 from torch.utils.checkpoint import checkpoint
-
-def count_parameters(model):
-    return sum(p.numel() for p in model.parameters() if p.requires_grad)
+from .DSC import DepthwiseSeparableConv
 
 class UpBlok(nn.Module):
-
     def __init__(self, in_channels, out_channels):
         super().__init__()
-        self.conv1x1 = nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=1, padding=0)
-        self.conv3x3 = nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1, padding=1)
-        self.deconv = nn.ConvTranspose2d(out_channels, out_channels, kernel_size=4, stride=2, padding=1)
+        self.layers = nn.ModuleDict({
+            'conv1x1': DepthwiseSeparableConv(in_channels, out_channels, kernel_size=1, padding=0),
+            'conv3x3': DepthwiseSeparableConv(out_channels, out_channels, kernel_size=3, padding=1),
+            'deconv': nn.ConvTranspose2d(out_channels, out_channels, kernel_size=4, stride=2, padding=1)
+        })
 
     def forward(self, upsampled, shortcut):
-        x = torch.cat([upsampled, shortcut], dim=1)
-        x = self.conv1x1(x)
-        # x = F.relu(x)
-        x = F.silu(x)
-        x = self.conv3x3(x)
-        # x = F.relu(x)
-        x = F.silu(x)
-        x = self.deconv(x)
-        return x
+        x = torch.cat((upsampled, shortcut), dim=1)
+        x = F.silu(self.layers['conv1x1'](x))
+        x = F.silu(self.layers['conv3x3'](x))
+        return self.layers['deconv'](x)
 
 class MergeBlok(nn.Module):
     def __init__(self, in_channels, out_channels):
         super().__init__()
-        self.conv1x1 = nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=1, padding=0)
-        self.conv3x3 = nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1, padding=1)
-
+        self.conv = nn.Sequential(
+            DepthwiseSeparableConv(in_channels, out_channels, kernel_size=1, padding=0),
+            nn.SiLU(inplace=True),
+            DepthwiseSeparableConv(out_channels, out_channels, kernel_size=3, padding=1)
+        )
+        
     def forward(self, upsampled, shortcut):
-        x = torch.cat([upsampled, shortcut], dim=1)
-        x = self.conv1x1(x)
-        # x = F.relu(x)
-        x = F.silu(x)
-        x = self.conv3x3(x)
-        return x
+        return self.conv(torch.cat((upsampled, shortcut), dim=1))
 
 class reduceBlock(nn.Module):
     def __init__(self, in_channels, out_channels):
         super().__init__()
-        self.conv1x1 = nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=1, padding=0, bias=False)
-        self.conv3x3 = nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1, padding=1, bias=False)
-        # self.bn1 = nn.BatchNorm2d(out_channels)
-        # self.bn2 = nn.BatchNorm2d(out_channels)
-        self.ln1 = nn.GroupNorm(out_channels//16, out_channels)  # LayerNorm 대신 GroupNorm 사용
-        self.ln2 = nn.GroupNorm(out_channels//16, out_channels)
-        self.deconv = nn.ConvTranspose2d(out_channels, out_channels, kernel_size=4, stride=2, padding=1) 
+        self.layers = nn.Sequential(
+            DepthwiseSeparableConv(in_channels, out_channels, kernel_size=1, padding=0),
+            nn.GroupNorm(out_channels//16, out_channels),
+            nn.SiLU(inplace=True),
+            DepthwiseSeparableConv(out_channels, out_channels, kernel_size=3, padding=1),
+            nn.GroupNorm(out_channels//16, out_channels),
+            nn.SiLU(inplace=True)
+        )
+        self.deconv = nn.ConvTranspose2d(out_channels, out_channels, 4, stride=2, padding=1)
+        
     def forward(self, x):
-        x = self.conv1x1(x)
-        x = self.ln1(x)
-        # x = F.relu(x)
-        x = F.silu(x)
-        x = self.conv3x3(x)
-        x = self.ln2(x)
-        # x = F.relu(x)
-        x = F.silu(x)
-        x = self.deconv(x)
-        return x
+        return self.deconv(self.layers(x))
 
 def horizonBlock(plane):
     return nn.Sequential(
-        nn.Conv2d(plane, plane, (3,7), stride = 1, padding = (1,3)), # (3,15) 7
-        # nn.ReLU(),
-        nn.SiLU(),
-        nn.Conv2d(plane, plane, (3,7), stride = 1, padding = (1,3)),
-        # nn.ReLU()
-        nn.SiLU()
+        DepthwiseSeparableConv(plane, plane, kernel_size=(3,7), padding=(1,3)),
+        nn.SiLU(inplace=True),
+        DepthwiseSeparableConv(plane, plane, kernel_size=(3,7), padding=(1,3)), 
+        nn.SiLU(inplace=True)
     )
-
+    
 class FPN(nn.Module):
     def __init__(self):
         super().__init__()
         self.backbone = FSNet()
         out_channels = self.backbone.channels * 4
-        self.hors = nn.ModuleList()
-        for i in range(4):
-            self.hors.append(horizonBlock(out_channels))
-        self.upc1 = nn.ConvTranspose2d(32, 32, kernel_size=4, stride=2, padding=1)
-        self.reduceLayer = reduceBlock(out_channels*5,32)
+        
+        self.hors = nn.ModuleList([horizonBlock(out_channels) for _ in range(4)])
 
-        self.cbam2 = CBAM(out_channels, kernel_size = 7)
-        self.cbam3 = CBAM(out_channels, kernel_size = 5)
-        self.cbam4 = CBAM(out_channels, kernel_size = 3)
-        self.cbam5 = CBAM(out_channels, kernel_size = 1)
-    
+        self.upc1 = nn.ConvTranspose2d(32, 32, kernel_size=4, stride=2, padding=1)
+        self.reduceLayer = reduceBlock(out_channels*5, 32)
+
+        kernel_sizes = [7, 5, 3, 1]
+        self.cbams = nn.ModuleList([
+            CBAM(out_channels, kernel_size=k) for k in kernel_sizes
+        ])
+
         self.conv_fusion = nn.Sequential(
-            nn.Conv2d(32, out_channels, kernel_size=1, bias=False),
-            nn.GroupNorm(out_channels//16, out_channels),
+            DepthwiseSeparableConv(32, 32, kernel_size=1, padding=0),
+            nn.GroupNorm(32//16, 32),
             nn.SiLU(True),
         )
 
-    def upsample(self, x, size):
-        _,_,h,w = size
-        return F.interpolate(x, size=(h, w), mode='bilinear')
+    @staticmethod
+    def upsample(x, size):
+        return F.interpolate(x, size=size[2:], mode='bilinear')
+
     def forward(self, x):
-        def backbone_forward(x):
-            c2, c3, c4, c5, high_res = self.backbone(x)
-            
-            c2 = self.hors[0](c2)
-            c3 = self.hors[1](c3)
-            c4 = self.hors[2](c4)
-            c5 = self.hors[3](c5)
-            
-            c2 = self.cbam2(c2)
-            c3 = self.cbam3(c3)
-            c4 = self.cbam4(c4)
-            c5 = self.cbam5(c5)
-
-            c3 = self.upsample(c3, size=c2.shape)
-            c4 = self.upsample(c4, size=c2.shape)
-            c5 = self.upsample(c5, size=c2.shape)
-            
-            return c2, c3, c4, c5, high_res
-            
-        c2, c3, c4, c5, high_res = checkpoint(backbone_forward, x)
-
-        combined = self.upc1(self.reduceLayer(torch.cat([c2, c3, c4, c5, high_res], dim=1)))
+        features = self.backbone(x)
+        c2, c3, c4, c5, high_res = features
         
-        del c2, c3, c4, c5, high_res
-        torch.cuda.empty_cache()
+        processed_features = []
+        for hor, c, cbam in zip(self.hors, [c2, c3, c4, c5], self.cbams):
+            feat = cbam(hor(c))
+            processed_features.append(feat)
         
+        # 업샘플링 처리
+        target_size = processed_features[0].shape
+        upsampled = [processed_features[0]]
+        for feat in processed_features[1:]:
+            upsampled.append(self.upsample(feat, target_size))
         
-        x = self.conv_fusion[0](combined)
-        del combined
-        torch.cuda.empty_cache()
+        features = upsampled + [high_res]
         
-        x = self.conv_fusion[1](x)
-        x = self.conv_fusion[2](x)
-        
+        x = torch.cat(features, dim=1)
+        x = self.reduceLayer(x)
+        x = self.upc1(x)
+        x = self.conv_fusion(x)
+    
         return x
