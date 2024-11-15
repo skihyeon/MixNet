@@ -128,6 +128,17 @@ class Evolution(nn.Module):
         for i, gcn in enumerate(self.evolve_gcns):
             init_polys = self.evolve_poly(gcn, embed_feature, init_polys, inds[0])
             py_preds.append(init_polys)
+            
+            # 더 이상 필요없는 중간 결과물 삭제
+            if i < len(self.evolve_gcns)-1:
+                del init_polys
+                init_polys = py_preds[-1]
+
+        # 메모리에서 불필요한 변수 제거
+        del embed_feature
+        del input
+        del seg_preds
+        del get_proposal
 
         return py_preds, inds, confidences
 def count_parameters(model):

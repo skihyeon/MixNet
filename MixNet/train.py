@@ -387,9 +387,10 @@ def main():
         # if epoch > 0:
         model.eval()  # 평가 모드로 설정
         inference(model, test_loader, criterion)
-        
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
+            
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            gc.collect()
 
 
 if __name__ == "__main__":
