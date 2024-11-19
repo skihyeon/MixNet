@@ -9,6 +9,7 @@ from torch.optim import lr_scheduler
 import gc
 
 from dataset.concat_datasets import AllDataset, AllDataset_mid
+from dataset.batch_sampler import BalancedBatchSampler
 from network.loss import TextLoss
 from network.textnet import TextNet
 from cfglib.config import config as cfg, update_config, print_config
@@ -49,7 +50,6 @@ def init_wandb(cfg):
         save_code= True,
     )
 
-
 def save_model(model, epoch, lr):
     save_dir = os.path.join(cfg.save_dir, cfg.exp_name)
     if not os.path.exists(save_dir):
@@ -82,7 +82,8 @@ def load_model(model, model_path):
     print('Loading from {}'.format(model_path))
     if accelerator:
         state_dict = torch.load(model_path, map_location=accelerator.device)
-    state_dict = torch.load(model_path, map_location=cfg.device)
+    else:
+        state_dict = torch.load(model_path, map_location=cfg.device)
     try:
         model.load_state_dict(state_dict['model'])
     except RuntimeError as e:
@@ -168,9 +169,9 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch):
             # Backward 시간 측정
             backward_start = time.time()
             if cfg.accumulation > 0:
-                loss = loss / cfg.accumulation  # gradient accumulation step 8
-
-                # optimizer.zero_grad()는 gradient accumulation step 8마다 수행
+                loss = loss / cfg.accumulation  # gradient accumulation step 설정
+                
+                # optimizer.zero_grad()는 gradient accumulation step마다 수행
                 if train_step % cfg.accumulation == 1:
                     model.zero_grad()
             else:
@@ -273,7 +274,6 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch):
     if epoch % cfg.save_freq == 0:
         save_model(model, epoch, scheduler.get_lr())
 
-
 def inference(model, test_loader, criterion):
     model.eval()
     torch.cuda.reset_max_memory_allocated()
@@ -333,16 +333,24 @@ def inference(model, test_loader, criterion):
             }
         })
 
-
 def main():
     global lr
     if accelerator.is_main_process and cfg.wandb:
         init_wandb(cfg)
     
-    trainset = AllDataset_mid(config=cfg, is_training=True) if cfg.mid else AllDataset(config=cfg, is_training=True)
-    train_loader = data.DataLoader(trainset, batch_size=cfg.batch_size,
-                                   shuffle=True, num_workers=cfg.num_workers,
-                                   pin_memory=True, generator=torch.Generator(device=cfg.device),persistent_workers=True,)  
+    if cfg.mid:
+        trainset = AllDataset_mid(config=cfg, is_training=True)
+    else:
+        trainset = AllDataset(config=cfg, is_training=True)
+    
+
+    # 커스텀 배치 샘플러 사용
+    batch_sampler = BalancedBatchSampler(trainset, batch_size=cfg.batch_size)
+
+    train_loader = data.DataLoader(trainset, batch_sampler=batch_sampler,
+                                   shuffle=False, num_workers=cfg.num_workers,
+                                   pin_memory=True, generator=torch.Generator(device=cfg.device),
+                                   persistent_workers=True)  
     
     testset = AllDataset(config=cfg, is_training=False)
     test_loader = data.DataLoader(testset, batch_size=1,
@@ -382,7 +390,6 @@ def main():
         except:
             pass
         
-
     for epoch in range(cfg.start_epoch, cfg.max_epoch+1):
         # if epoch == 0 :
         #     model.eval()

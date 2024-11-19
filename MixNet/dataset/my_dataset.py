@@ -28,10 +28,20 @@ class myDataset(TextDataset):
         self.annotation_root = os.path.join(data_root, 'Train' if is_training else 'Test', 'gt')
         self.image_list = os.listdir(self.image_root)
         self.annotation_list = [os.path.join(self.annotation_root, img + '.json') for img in self.image_list]
-
         # JSON 데이터 캐싱
         self.json_cache = {}
-        
+        # 각 이미지의 annotation 수 저장
+        self.annotation_counts = []
+        for ann_path in self.annotation_list:
+            polygons = self.parse_json(ann_path)
+            if polygons:  # False가 아닌 경우에만 계산
+                count = len(polygons)
+            else:
+                count = 0
+            self.annotation_counts.append(count)
+            
+        # print(f"Dataset {data_root}: annotation count range {min(self.annotation_counts)} ~ {max(self.annotation_counts)}")
+            
         if self.load_memory:
             self.datas = []
             for item in range(len(self.image_list)):
