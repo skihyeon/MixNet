@@ -24,7 +24,7 @@ from accelerate import Accelerator, DistributedDataParallelKwargs
 import wandb
 
 kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
-accelerator = Accelerator(kwargs_handlers=[kwargs])
+accelerator = Accelerator(kwargs_handlers=[kwargs], mixed_precision='no')
 # accelerator = Accelerator()
 train_step = 0
 
@@ -262,8 +262,13 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch):
 
             # 메모리 정리
             del input_dict, output_dict, loss_dict, loss
-            torch.cuda.empty_cache()
+            if hasattr(torch.cuda, 'empty_cache'):
+                torch.cuda.empty_cache()
             gc.collect()
+            
+            if i > 0 and i % 100 == 0:  # 10 배치마다 강제로 메모리 정리
+                torch.cuda.empty_cache()
+                gc.collect()
             
     if epoch % cfg.save_freq == 0:
         save_model(model, epoch, scheduler.get_lr())
