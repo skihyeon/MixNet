@@ -1,12 +1,6 @@
-###################################################################
-# File Name: GCN.py
-# Author: S.X.Zhang
-###################################################################
 import torch
-from torch import nn, Tensor
+from torch import nn
 import numpy as np
-from cfglib.config import config as cfg
-
 
 class Positional_encoding(nn.Module):
     def __init__(self, PE_size, n_position=256):
@@ -56,9 +50,7 @@ class MultiHeadAttention(nn.Module):
 class FeedForward(nn.Module):
     def __init__(self, in_channel, FFN_channel, if_resi=True):
         super(FeedForward, self).__init__()
-        """
-        1024 2048
-        """
+
         output_channel = (FFN_channel, in_channel)
         self.fc1 = nn.Sequential(nn.Linear(in_channel, output_channel[0]), nn.SiLU())
         self.fc2 = nn.Linear(output_channel[0], output_channel[1])
@@ -89,7 +81,7 @@ class TransformerLayer(nn.Module):
 
     def forward(self, query):
         inputs = self.linear(query)
-        # outputs = inputs
+ 
         for i in range(self.block_nums):
             outputs = self.__getattr__('MHA_self_%d' % i)(inputs)
             outputs = self.__getattr__('FFN_%d' % i)(outputs)
@@ -97,7 +89,7 @@ class TransformerLayer(nn.Module):
                 inputs = inputs+outputs
             else:
                 inputs = outputs
-        # outputs = inputs
+ 
         return inputs
 
 
@@ -114,9 +106,6 @@ class Transformer(nn.Module):
         self.transformer = TransformerLayer(in_dim, out_dim, num_heads, attention_size=out_dim,
                                             dim_feedforward=dim_feedforward, drop_rate=drop_rate,
                                             if_resi=if_resi, block_nums=block_nums, batch_first=batch_first)
-        # self.transformer_contour = TransformerLayer(in_dim, out_dim, num_heads, attention_size=out_dim,
-        #                                     dim_feedforward=dim_feedforward, drop_rate=drop_rate,
-        #                                     if_resi=if_resi, block_nums=block_nums, batch_first=True)
 
         self.prediction = nn.Sequential(
             nn.Conv1d(2*out_dim, 128, 1),
@@ -148,3 +137,6 @@ class Transformer(nn.Module):
         # pred = self.prediction(x)
 
         return pred
+
+
+

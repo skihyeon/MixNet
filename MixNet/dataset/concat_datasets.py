@@ -120,10 +120,10 @@ def AllDataset(config, is_training):
     if custom_datasets:
         datasets.append(custom_datasets)
 
-    if not datasets:
+    if not datasets and is_training:
         raise ValueError("데이터셋이 선택되지 않았습니다. open_data 또는 custom_data 중 하나 이상을 선택해주세요.")
     
-    return ConcatDataset(datasets)
+    return ConcatDataset(datasets) if datasets else None
 
 
 def concat_open_datas_mid(config, is_training, open_data_root: str = "data/open_datas"):
