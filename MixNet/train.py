@@ -104,14 +104,11 @@ def _parse_data(inputs):
     return input_dict
 
 def train(model, train_loader, criterion, scheduler, optimizer, epoch):
-    if cfg.wandb:
-        wandb.watch(model, criterion, log="all", log_freq=10)
+    # if cfg.wandb:
+        # wandb.watch(model, criterion, log="all", log_freq=10)
     global train_step
 
     losses = AverageMeter()
-    batch_time = AverageMeter()
-    data_time = AverageMeter()
-    end = time.time()
     model.train()
 
     if accelerator:
@@ -120,6 +117,14 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch):
     else:
         print(f'Epoch: {epoch} : LR = {scheduler.get_lr()}')
     
+    ## for loss
+    cls_losses = AverageMeter()
+    distance_losses = AverageMeter()
+    direction_losses = AverageMeter()
+    norm_losses = AverageMeter()
+    angle_losses = AverageMeter()
+    point_losses = AverageMeter()
+    energy_losses = AverageMeter()
 
     # log 파일 경로 설정
     log_dir = os.path.join(cfg.save_dir, cfg.exp_name)
@@ -130,7 +135,6 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch):
     with open(log_path, 'a') as log_file:
         pbar = tqdm(train_loader, desc=f"Epoch {epoch}")
         for i, inputs in enumerate(pbar):
-            data_time.update(time.time() - end)
             train_step += 1
             input_dict = _parse_data(inputs)
 
@@ -138,23 +142,53 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch):
             loss_dict = criterion(input_dict, output_dict)
             loss = loss_dict["total_loss"]
 
-            # optimizer.zero_grad()
-            model.zero_grad()
+            if cfg.accumulation > 0:
+                loss = loss / cfg.accumulation  # gradient accumulation step 8
+
+                # optimizer.zero_grad()는 gradient accumulation step 8마다 수행
+                if train_step % cfg.accumulation == 1:
+                    model.zero_grad()
+            else:
+                model.zero_grad()
+
             if accelerator:
                 accelerator.backward(loss)
             else:
                 loss.backward()
                                     
-            torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.grad_clip)
+            if cfg.accumulation:
+                if train_step % cfg.accumulation == 0:
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.grad_clip)
+                    optimizer.step()
+                    scheduler.step()
+            else:
+                torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.grad_clip)
+                optimizer.step()
+                scheduler.step()
 
+            if cfg.accumulation:
+                losses.update(loss.item() * cfg.accumulation)  # 원래 loss 값으로 업데이트
+            else:
+                losses.update(loss.item())
             
-            optimizer.step()
-            scheduler.step()
+            ## for logging ##
+            if not cfg.onlybackbone:
+                cls_loss = loss_dict["cls_loss"]
+                dis_loss = loss_dict["distance_loss"]
+                dir_loss = loss_dict["dir_loss"]
+                norm_loss = loss_dict["norm_loss"]
+                angle_loss = loss_dict["angle_loss"]
+                point_loss = loss_dict["point_loss"]
+                energy_loss = loss_dict["energy_loss"]
 
-            losses.update(loss.item())
+                cls_losses.update(cls_loss.item())
+                distance_losses.update(dis_loss.item())
+                direction_losses.update(dir_loss.item())
+                norm_losses.update(norm_loss.item())
+                angle_losses.update(angle_loss.item())
+                point_losses.update(point_loss.item())
+                energy_losses.update(energy_loss.item())
 
-            batch_time.update(time.time()-end)
-            end = time.time()
 
             # 학습과정 visualization
             if cfg.viz and (i % cfg.viz_freq == 0 and i > 0):
@@ -168,11 +202,22 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch):
             log_file.write(f'Epoch: {epoch}, Step: {i}, Loss: {losses.avg:.2f}, Max Memory: {max_memory:.2f} MB\n')
             
             if accelerator.is_main_process and cfg.wandb:
-                wandb.log({
+                log_dict = {
                     "epoch": epoch,
                     "train_loss": losses.avg,
-                    "lr": scheduler.get_lr()[0]
-                })
+                    "lr": scheduler.get_last_lr()[0],
+                }
+                if cfg.onlybackbone == False:
+                    log_dict.update({   
+                        "losses/class_loss" : cls_losses.avg,
+                        "losses/distance_loss": distance_losses.avg,
+                        "losses/direction_loss": direction_losses.avg,
+                        "losses/norm_loss": norm_losses.avg,
+                        "losses/angle_loss": angle_losses.avg,
+                        "losses/point_loss": point_losses.avg,
+                        "losses/energy_loss": energy_losses.avg
+                    })
+                wandb.log(log_dict)
 
             # 메모리 정리
             del input_dict, output_dict, loss_dict, loss
@@ -243,11 +288,11 @@ def main():
     trainset = AllDataset_mid(config=cfg, is_training=True) if cfg.mid else AllDataset(config=cfg, is_training=True)
     train_loader = data.DataLoader(trainset, batch_size=cfg.batch_size,
                                    shuffle=True, num_workers=cfg.num_workers,
-                                   pin_memory=True, generator=torch.Generator(device=cfg.device),)  # collate_fn 추가
+                                   pin_memory=True, generator=torch.Generator(device=cfg.device),persistent_workers=True,)  
     
     testset = AllDataset(config=cfg, is_training=False)
     test_loader = data.DataLoader(testset, batch_size=1,
-                                  shuffle=False, num_workers=0,)  # collate_fn 추가
+                                  shuffle=False, num_workers=0)  
 
     model = TextNet(backbone=cfg.net, is_training=True)
 
@@ -274,12 +319,26 @@ def main():
     if cfg.cuda:
         cudnn.benchmark = True
 
+
+    if cfg.resume :
+        try:
+            start_iter = int(cfg.resume.split('_')[-1].split('.')[0]) + 1
+            print(f'continue to train, start_iter: {start_iter}')
+            cfg.start_epoch = start_iter 
+        except:
+            pass
+        
+
     for epoch in range(cfg.start_epoch, cfg.max_epoch+1):
+        if epoch == 0 :
+            model.eval()
+            inference(model, test_loader, criterion)
         model.train()  # 훈련 모드로 설정
         train(model, train_loader, criterion, scheduler, optimizer, epoch)
-        if epoch > 0:
-            model.eval()  # 평가 모드로 설정
-            inference(model, test_loader, criterion)
+        if epoch > 0 and testset is not None:
+            if len(test_loader) > 0:
+                model.eval()  # Set to evaluation mode
+                inference(model, test_loader, criterion)
         
     if torch.cuda.is_available():
         torch.cuda.empty_cache()

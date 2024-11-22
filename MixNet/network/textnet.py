@@ -132,9 +132,11 @@ class TextNet(nn.Module):
 
         self.seg_head = nn.Sequential(
             nn.Conv2d(32, 16, kernel_size=3, padding=2, dilation=2),
-            nn.PReLU(),
+            # nn.PReLU(),
+            nn.SiLU(),
             nn.Conv2d(16, 16, kernel_size=3, padding=4, dilation=4),
-            nn.PReLU(),
+            # nn.PReLU(),
+            nn.SiLU(),
             nn.Conv2d(16, 4, kernel_size=1, stride=1, padding=0),
         )
 
@@ -143,6 +145,13 @@ class TextNet(nn.Module):
                 self.BPN = midlinePredictor(seg_channel=32+4, is_training=is_training)
             else:
                 self.BPN = Evolution(cfg.num_points, seg_channel=32+4, is_training=is_training, device=cfg.device)
+
+        self.multiscale_heads = nn.ModuleList([
+            nn.Conv2d(256, 32, kernel_size=3, padding=1),
+            nn.Conv2d(256, 32, kernel_size=3, padding=1),
+            nn.Conv2d(256, 32, kernel_size=3, padding=1),
+            nn.Conv2d(256, 32, kernel_size=3, padding=1)
+        ])
 
         print(f"Total MixNet with {self.backbone_name} parameter size: ", count_parameters(self))
         
@@ -173,7 +182,16 @@ class TextNet(nn.Module):
 
         up1 = self.fpn(image)
 
-        preds = self.seg_head(up1)
+        combined = None
+        for i, head in enumerate(self.multiscale_heads):
+            ms_feat = head(up1)
+            if combined is None:
+                combined = ms_feat
+            else:
+                combined.add_(ms_feat)  # inplace 연산으로 변경
+                del ms_feat
+
+        preds = self.seg_head(combined)
 
         fy_preds = torch.cat([torch.sigmoid(preds[:, 0:2, :, :]), preds[:, 2:4, :, :]], dim=1)
 
@@ -181,7 +199,7 @@ class TextNet(nn.Module):
             output["fy_preds"] = fy_preds
             return output
 
-        cnn_feats = torch.cat([up1, fy_preds], dim=1)
+        cnn_feats = torch.cat([combined, fy_preds], dim=1)
         if cfg.mid:
             py_preds, inds, confidences, midline = self.BPN(cnn_feats, input=input_dict, seg_preds=fy_preds, switch="gt")
         else:
