@@ -182,12 +182,14 @@ class TextNet(nn.Module):
 
         up1 = self.fpn(image)
 
-        ms_features = []
+        combined = None
         for i, head in enumerate(self.multiscale_heads):
             ms_feat = head(up1)
-            ms_features.append(ms_feat)
-
-        combined = sum(ms_features)
+            if combined is None:
+                combined = ms_feat
+            else:
+                combined.add_(ms_feat)  # inplace 연산으로 변경
+                del ms_feat
 
         preds = self.seg_head(combined)
 
