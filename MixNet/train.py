@@ -396,7 +396,6 @@ def main():
         #     inference(model, test_loader, criterion)
         model.train()  # 훈련 모드로 설정
         train(model, train_loader, criterion, scheduler, optimizer, epoch)
-<<<<<<< HEAD
         if epoch > 0 and testset is not None:
             if len(test_loader) > 0:
                 model.eval()  # Set to evaluation mode
@@ -404,15 +403,6 @@ def main():
         
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
-=======
-        # if epoch > 0:
-        model.eval()  # 평가 모드로 설정
-        inference(model, test_loader, criterion)
-            
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-            gc.collect()
->>>>>>> 모델구조변경
 
 
 if __name__ == "__main__":
