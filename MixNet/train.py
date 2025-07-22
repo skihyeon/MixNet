@@ -9,6 +9,7 @@ from torch.optim import lr_scheduler
 import gc
 
 from dataset.concat_datasets import AllDataset, AllDataset_mid
+from dataset.batch_sampler import BalancedBatchSampler
 from network.loss import TextLoss
 from network.textnet import TextNet
 from cfglib.config import config as cfg, update_config, print_config
@@ -24,10 +25,20 @@ from accelerate import Accelerator, DistributedDataParallelKwargs
 import wandb
 
 kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
-accelerator = Accelerator(kwargs_handlers=[kwargs])
+accelerator = Accelerator(kwargs_handlers=[kwargs], mixed_precision='no')
 # accelerator = Accelerator()
 train_step = 0
 
+# 시간 측정을 위한 클래스 정의
+class TimeMeter:
+    def __init__(self):
+        self.reset()
+        
+    def reset(self):
+        self.data_time = AverageMeter()
+        self.forward_time = AverageMeter() 
+        self.backward_time = AverageMeter()
+        self.batch_time = AverageMeter()
 
 def init_wandb(cfg):
     wandb.login(key=os.environ.get("WANDB_API_KEY"))
@@ -38,7 +49,6 @@ def init_wandb(cfg):
         entity = os.environ.get("WANDB_ENTITY"),
         save_code= True,
     )
-
 
 def save_model(model, epoch, lr):
     save_dir = os.path.join(cfg.save_dir, cfg.exp_name)
@@ -72,7 +82,8 @@ def load_model(model, model_path):
     print('Loading from {}'.format(model_path))
     if accelerator:
         state_dict = torch.load(model_path, map_location=accelerator.device)
-    state_dict = torch.load(model_path, map_location=cfg.device)
+    else:
+        state_dict = torch.load(model_path, map_location=cfg.device)
     try:
         model.load_state_dict(state_dict['model'])
     except RuntimeError as e:
@@ -104,12 +115,11 @@ def _parse_data(inputs):
     return input_dict
 
 def train(model, train_loader, criterion, scheduler, optimizer, epoch):
-    # if cfg.wandb:
-        # wandb.watch(model, criterion, log="all", log_freq=10)
     global train_step
 
     losses = AverageMeter()
     model.train()
+    time_meter = TimeMeter()
 
     if accelerator:
         if accelerator.is_main_process:
@@ -133,19 +143,35 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch):
         mkdirs(log_dir)
 
     with open(log_path, 'a') as log_file:
-        pbar = tqdm(train_loader, desc=f"Epoch {epoch}")
+        if accelerator.is_main_process:
+            pbar = tqdm(train_loader, desc=f"Epoch {epoch}")
+        else:
+            pbar = train_loader
         for i, inputs in enumerate(pbar):
             train_step += 1
+            
+            batch_start = time.time()
+            
+            # 데이터 로딩 시간 측정
+            data_start = time.time()
             input_dict = _parse_data(inputs)
+            data_time = time.time() - data_start
+            time_meter.data_time.update(data_time)
 
+            # Forward 시간 측정
+            forward_start = time.time()
             output_dict = model(input_dict)
             loss_dict = criterion(input_dict, output_dict)
             loss = loss_dict["total_loss"]
+            forward_time = time.time() - forward_start
+            time_meter.forward_time.update(forward_time)
 
+            # Backward 시간 측정
+            backward_start = time.time()
             if cfg.accumulation > 0:
-                loss = loss / cfg.accumulation  # gradient accumulation step 8
-
-                # optimizer.zero_grad()는 gradient accumulation step 8마다 수행
+                loss = loss / cfg.accumulation  # gradient accumulation step 설정
+                
+                # optimizer.zero_grad()는 gradient accumulation step마다 수행
                 if train_step % cfg.accumulation == 1:
                     model.zero_grad()
             else:
@@ -165,6 +191,13 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch):
                 torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.grad_clip)
                 optimizer.step()
                 scheduler.step()
+                
+            backward_time = time.time() - backward_start
+            time_meter.backward_time.update(backward_time)
+            
+            # 전체 배치 시간 측정
+            batch_time = time.time() - batch_start
+            time_meter.batch_time.update(batch_time)
 
             if cfg.accumulation:
                 losses.update(loss.item() * cfg.accumulation)  # 원래 loss 값으로 업데이트
@@ -172,34 +205,43 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch):
                 losses.update(loss.item())
             
             ## for logging ##
-            if not cfg.onlybackbone:
-                cls_loss = loss_dict["cls_loss"]
-                dis_loss = loss_dict["distance_loss"]
-                dir_loss = loss_dict["dir_loss"]
-                norm_loss = loss_dict["norm_loss"]
-                angle_loss = loss_dict["angle_loss"]
-                point_loss = loss_dict["point_loss"]
-                energy_loss = loss_dict["energy_loss"]
+            cls_loss = loss_dict["cls_loss"]
+            dis_loss = loss_dict["distance_loss"]
+            dir_loss = loss_dict["dir_loss"]
+            norm_loss = loss_dict["norm_loss"]
+            angle_loss = loss_dict["angle_loss"]
+            point_loss = loss_dict["point_loss"]
+            energy_loss = loss_dict["energy_loss"]
 
-                cls_losses.update(cls_loss.item())
-                distance_losses.update(dis_loss.item())
-                direction_losses.update(dir_loss.item())
-                norm_losses.update(norm_loss.item())
-                angle_losses.update(angle_loss.item())
-                point_losses.update(point_loss.item())
-                energy_losses.update(energy_loss.item())
-
+            cls_losses.update(cls_loss.item())
+            distance_losses.update(dis_loss.item())
+            direction_losses.update(dir_loss.item())
+            norm_losses.update(norm_loss.item())
+            angle_losses.update(angle_loss.item())
+            point_losses.update(point_loss.item())
+            energy_losses.update(energy_loss.item())
 
             # 학습과정 visualization
             if cfg.viz and (i % cfg.viz_freq == 0 and i > 0):
                 visualize_network_output(output_dict, input_dict, mode='train')
 
             max_memory = torch.cuda.max_memory_allocated() / 1024 / 1024
-
-            pbar.set_postfix({'Training Loss': f'{losses.avg:.2f}', 'Max Memory': f'{max_memory:.2f} MB'})
+            
+            # 시간 측정 결과 출력
+            time_info = {
+                # 'Data Time': f'{time_meter.data_time.avg:.2f}s',
+                'Forward': f'{time_meter.forward_time.avg:.2f}s',
+                'Back': f'{time_meter.backward_time.avg:.2f}s',
+                # 'Batch Time': f'{time_meter.batch_time.avg:.2f}s'
+            }
+            
+            if accelerator.is_main_process:
+                pbar.set_postfix({'Training Loss': f'{losses.avg:.2f}, time: {time_info}', 'Max Memory': f'{max_memory:.2f} MB'})
+                # pbar.set_postfix(time_info)
 
             # 로그 파일에 학습 정보 저장
-            log_file.write(f'Epoch: {epoch}, Step: {i}, Loss: {losses.avg:.2f}, Max Memory: {max_memory:.2f} MB\n')
+            if accelerator.is_main_process:
+                log_file.write(f'Epoch: {epoch}, Step: {i}, Loss: {losses.avg:.2f}, Max Memory: {max_memory:.2f} MB\n')
             
             if accelerator.is_main_process and cfg.wandb:
                 log_dict = {
@@ -221,15 +263,24 @@ def train(model, train_loader, criterion, scheduler, optimizer, epoch):
 
             # 메모리 정리
             del input_dict, output_dict, loss_dict, loss
-            torch.cuda.empty_cache()
+            if hasattr(torch.cuda, 'empty_cache'):
+                torch.cuda.empty_cache()
             gc.collect()
+            
+            if i > 0 and i % 100 == 0:  # 10 배치마다 강제로 메모리 정리
+                torch.cuda.empty_cache()
+                gc.collect()
+            
     if epoch % cfg.save_freq == 0:
         save_model(model, epoch, scheduler.get_lr())
 
-
 def inference(model, test_loader, criterion):
     model.eval()
-    pbar = tqdm(test_loader, desc="Valid")
+    torch.cuda.reset_max_memory_allocated()
+    if accelerator.is_main_process:
+        pbar = tqdm(test_loader, desc="Valid")
+    else:
+        pbar = test_loader
     total_hit_rate = 0
     total_precision = 0
     total_recall = 0
@@ -262,7 +313,10 @@ def inference(model, test_loader, criterion):
         total_recall += recall
         total_hmean += hmean
         num_images += 1
-        pbar.set_postfix({'hr': f'{hit_rate}', "f1": f'{precision:.2f}/{recall:.2f}/{hmean:.2f}'})
+
+        max_memory = torch.cuda.max_memory_allocated() / 1024 / 1024
+        if accelerator.is_main_process:
+            pbar.set_postfix({'hr': f'{hit_rate}', "f1": f'{precision:.2f}/{recall:.2f}/{hmean:.2f}', 'Max Memory': f'{max_memory:.2f} MB'})
 
     avg_hit_rate = total_hit_rate / num_images
     avg_precision = total_precision / num_images
@@ -279,16 +333,24 @@ def inference(model, test_loader, criterion):
             }
         })
 
-
 def main():
     global lr
     if accelerator.is_main_process and cfg.wandb:
         init_wandb(cfg)
     
-    trainset = AllDataset_mid(config=cfg, is_training=True) if cfg.mid else AllDataset(config=cfg, is_training=True)
-    train_loader = data.DataLoader(trainset, batch_size=cfg.batch_size,
-                                   shuffle=True, num_workers=cfg.num_workers,
-                                   pin_memory=True, generator=torch.Generator(device=cfg.device),persistent_workers=True,)  
+    if cfg.mid:
+        trainset = AllDataset_mid(config=cfg, is_training=True)
+    else:
+        trainset = AllDataset(config=cfg, is_training=True)
+    
+
+    # 커스텀 배치 샘플러 사용
+    batch_sampler = BalancedBatchSampler(trainset, batch_size=cfg.batch_size)
+
+    train_loader = data.DataLoader(trainset, batch_sampler=batch_sampler,
+                                   shuffle=False, num_workers=cfg.num_workers,
+                                   pin_memory=True, generator=torch.Generator(device=cfg.device),
+                                   persistent_workers=True)  
     
     testset = AllDataset(config=cfg, is_training=False)
     test_loader = data.DataLoader(testset, batch_size=1,
@@ -328,13 +390,13 @@ def main():
         except:
             pass
         
-
     for epoch in range(cfg.start_epoch, cfg.max_epoch+1):
-        if epoch == 0 :
-            model.eval()
-            inference(model, test_loader, criterion)
+        # if epoch == 0 :
+        #     model.eval()
+        #     inference(model, test_loader, criterion)
         model.train()  # 훈련 모드로 설정
         train(model, train_loader, criterion, scheduler, optimizer, epoch)
+<<<<<<< HEAD
         if epoch > 0 and testset is not None:
             if len(test_loader) > 0:
                 model.eval()  # Set to evaluation mode
@@ -342,6 +404,15 @@ def main():
         
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
+=======
+        # if epoch > 0:
+        model.eval()  # 평가 모드로 설정
+        inference(model, test_loader, criterion)
+            
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            gc.collect()
+>>>>>>> 모델구조변경
 
 
 if __name__ == "__main__":

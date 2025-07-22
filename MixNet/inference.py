@@ -63,26 +63,28 @@ class myDataset(TextDataset):
 def inference(model, image_path, output_dir):
 
     torch.cuda.set_device(torch.cuda.current_device())
-
+    start_time = time.time()
     dataset = myDataset(image_path=image_path,transform=BaseTransform(size=cfg.test_size, mean=cfg.means, std=cfg.stds))
     data = dataset[0]
     image, meta = data
-
+    print(f'데이터 전처리 시간: {time.time() - start_time:.3f}초')
     input_dict = dict()
     H, W = meta['Height'], meta['Width']
 
+
+    start_time = time.time()
     input_dict['img'] = torch.tensor(image[np.newaxis, :]).to(cfg.device)
     with torch.no_grad():
         output_dict = model(input_dict, test_speed=True)
-    
+    print(f'추론 시간: {time.time() - start_time:.3f}초')
     # print(f'{image_path} processing...', end='\r', flush=True)
     img_show = image.transpose(1, 2, 0)
     img_show = ((img_show * cfg.stds + cfg.means) * 255).astype(np.uint8)
     from util.visualize import visualize_detection_rect
     show_boundary, heat_map = visualize_detection_rect(img_show, output_dict, meta=meta, infer=True)
 
-    # im_vis = np.concatenate([heat_map, show_boundary], axis=1)
-    im_vis = np.concatenate([show_boundary], axis=1)
+    im_vis = np.concatenate([heat_map, show_boundary], axis=1)
+    # im_vis = np.concatenate([show_boundary], axis=1)
 
     _, im_buf_arr = cv2.imencode('.jpg', im_vis)    # 한글경로 인식 문제 해결
     base_name = os.path.splitext(os.path.basename(image_path))[0]  # 파일 이름에 '.'이 여러개 들어있을 경우 마지막 확장자만 제거하도록 수정

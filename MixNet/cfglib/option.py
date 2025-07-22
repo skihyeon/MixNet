@@ -47,7 +47,7 @@ class BaseOptions(object):
 
         # backbone
         self.parser.add_argument('--scale', default=1, type=int, help='prediction on 1/scale feature map')
-        self.parser.add_argument('--net', default='FSNet_M', type=str,
+        self.parser.add_argument('--net', default='FSNet_H_M', type=str,
                                  choices=["FSNet_M", "FSNet_S","FSNet_hor", "FSNet_H_M"],
                                  help='Network architecture')
         self.parser.add_argument('--mid', default=False, type=str2bool, help='midline predict to Transformer')
@@ -64,8 +64,8 @@ class BaseOptions(object):
         # eval args00
         self.parser.add_argument('--checkepoch', default=1070, type=int, help='Load checkpoint number')
         self.parser.add_argument('--start_epoch', default=0, type=int, help='start epoch number')
-        self.parser.add_argument('--cls_threshold', default=0.875, type=float, help='threshold of pse')
-        self.parser.add_argument('--dis_threshold', default=0.35, type=float, help='filter the socre < score_i')
+        self.parser.add_argument('--cls_threshold', default=0.2, type=float, help='threshold of pse')
+        self.parser.add_argument('--dis_threshold', default=0.6, type=float, help='filter the socre < score_i')
 
         # demo args
         self.parser.add_argument('--img_root', default=None,   type=str, help='Path to deploy images')

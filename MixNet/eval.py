@@ -77,8 +77,8 @@ def inference(model, test_loader, output_dir):
         heat_map = cv2.resize(heat_map, (W, H))
         gt_vis = cv2.resize(gt_vis, (W, H))
         show_boundary = cv2.resize(show_boundary, (W, H))
-        # im_vis = np.concatenate([heat_map, gt_vis, show_boundary], axis=1)
-        im_vis = np.concatenate([gt_vis, show_boundary], axis=1)
+        im_vis = np.concatenate([heat_map, gt_vis, show_boundary], axis=1)
+        # im_vis = np.concatenate([gt_vis, show_boundary], axis=1)
 
         _, buffer = cv2.imencode('.jpg', im_vis)    # 한글 경로 깨지는 경우 대비
         path = os.path.join(cfg.vis_dir, '{}_test'.format(cfg.exp_name), meta['image_id'][idx].split(".")[0]+".jpg")

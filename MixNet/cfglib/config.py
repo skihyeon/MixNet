@@ -56,12 +56,13 @@ config.scale = 1
 config.grad_clip = 25
 
 # demo tcl threshold
-config.dis_threshold = 0.3
+config.dis_threshold = 0.3 # distance threshold, 라인 분리 정도. 높을수록 분리 정도가 높아짐.
+
 #
-config.cls_threshold = 0.8
+config.cls_threshold = 0.875 # class threshold, 클래스 검출 threshold. 낮을수록 작은 객체 검출도 높아짐.
 
 # Contour approximation factor
-config.approx_factor = 0.004
+config.approx_factor = 0.001
 
 config.resume=False
 config.mid = False

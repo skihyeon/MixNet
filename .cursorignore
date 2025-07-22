@@ -1,0 +1,25 @@
+# Add directories or file patterns to ignore during indexing (e.g. foo/ or *.csv)
+*.log
+*.jpg
+*.png
+*.gif
+*.mp4
+*.mov
+*.wav
+*.mp3
+*.jpeg
+*.webp
+*.svg
+*.ico
+*.json
+*.xml
+*.yml
+*.yaml
+*.sh
+*.txt
+*.pyc
+*.pyo
+*.pyd
+*.pyz
+*.pyw
+*.pth
